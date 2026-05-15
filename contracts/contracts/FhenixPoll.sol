@@ -31,7 +31,7 @@ contract FhenixPoll is EIP712 {
         uint8    optionCount;
         bool     tallyRevealed;
         bool     exists;
-        bool     isHierarchical;
+        uint8    pollType;  // 0=RANKED, 1=HIERARCHICAL, 2=SIMPLE, 3=SURVEY
     }
 
     /// @dev On-chain option node for hierarchical polls.
@@ -91,6 +91,17 @@ contract FhenixPoll is EIP712 {
         bool      exists;
     }
 
+    // ─── Wave 5: Surveys ─────────────────────────────────────────────────────
+
+    struct SurveyQuestion {
+        uint8   questionId;   // 1-based
+        uint8   answerCount;  // 2–10
+        bytes32 labelHash;    // keccak256(question text)
+        bool    exists;
+    }
+
+    uint8 public constant MAX_SURVEY_QUESTIONS = 20;
+
     // ─── Storage ──────────────────────────────────────────────────────────────
 
     mapping(bytes32 => Community) public communities;
@@ -138,6 +149,12 @@ contract FhenixPoll is EIP712 {
     mapping(bytes32 => mapping(address => bytes32)) public questProgressCtHash;
     // questId => address => completed
     mapping(bytes32 => mapping(address => bool)) public questCompleted;
+
+    // Wave 5: Surveys
+    mapping(bytes32 => mapping(uint8 => SurveyQuestion)) public surveyQuestions;
+    mapping(bytes32 => mapping(uint8 => mapping(uint8 => euint32))) private _surveyTallies;
+    mapping(bytes32 => mapping(uint8 => mapping(uint8 => uint32))) public surveyRevealedTallies;
+    mapping(bytes32 => mapping(uint8 => mapping(uint8 => bytes32))) public surveyCtHashes;
 
     // ─── Events ───────────────────────────────────────────────────────────────
 
@@ -194,7 +211,7 @@ contract FhenixPoll is EIP712 {
         uint32  durationBlocks,
         uint8   optionCount
     ) external {
-        _createPoll(pollId, communityId, credType, durationBlocks, optionCount, false);
+        _createPoll(pollId, communityId, credType, durationBlocks, optionCount, 0);
     }
 
     /// @notice Create a hierarchical poll and register the option tree on-chain.
@@ -212,7 +229,7 @@ contract FhenixPoll is EIP712 {
         require(parentIds.length == optionCount, "parentIds length mismatch");
         require(labelHashes.length == optionCount, "labelHashes length mismatch");
 
-        _createPoll(pollId, communityId, credType, durationBlocks, optionCount, true);
+        _createPoll(pollId, communityId, credType, durationBlocks, optionCount, 1);
 
         // Register option tree
         for (uint8 i = 0; i < optionCount; i++) {
@@ -241,7 +258,7 @@ contract FhenixPoll is EIP712 {
         uint8   credType,
         uint32  durationBlocks,
         uint8   optionCount,
-        bool    isHierarchical
+        uint8   pollType
     ) internal {
         require(communities[communityId].exists, "Community not found");
         require(communities[communityId].creator == msg.sender, "Not community creator");
@@ -258,12 +275,86 @@ contract FhenixPoll is EIP712 {
             optionCount:     optionCount,
             tallyRevealed:   false,
             exists:          true,
-            isHierarchical:  isHierarchical
+            pollType:        pollType
         });
         emit PollCreated(pollId, communityId, uint32(block.number) + durationBlocks);
     }
 
+    /// @notice Create a simple single-choice poll (pick exactly one option).
+    function createSimplePoll(
+        bytes32 pollId,
+        bytes32 communityId,
+        uint8   credType,
+        uint32  durationBlocks,
+        uint8   optionCount
+    ) external {
+        _createPoll(pollId, communityId, credType, durationBlocks, optionCount, 2);
+    }
+
+    /// @notice Create an anonymous survey with multiple questions.
+    /// @param questionCount  Number of questions (stored in optionCount field)
+    /// @param answerCounts   answerCounts[i] = number of answer options for question i+1
+    /// @param labelHashes    keccak256(question text) per question
+    function createSurvey(
+        bytes32   pollId,
+        bytes32   communityId,
+        uint8     credType,
+        uint32    durationBlocks,
+        uint8     questionCount,
+        uint8[]   calldata answerCounts,
+        bytes32[] calldata labelHashes
+    ) external {
+        require(questionCount >= 1 && questionCount <= MAX_SURVEY_QUESTIONS, "Questions: 1-20");
+        require(answerCounts.length == questionCount, "answerCounts length");
+        require(labelHashes.length == questionCount, "labelHashes length");
+
+        _createPoll(pollId, communityId, credType, durationBlocks, questionCount, 3);
+
+        for (uint8 i = 0; i < questionCount; i++) {
+            require(answerCounts[i] >= 2 && answerCounts[i] <= 10, "Answers: 2-10");
+            surveyQuestions[pollId][i + 1] = SurveyQuestion({
+                questionId:  i + 1,
+                answerCount: answerCounts[i],
+                labelHash:   labelHashes[i],
+                exists:      true
+            });
+        }
+    }
+
     // ─── Voting ───────────────────────────────────────────────────────────────
+
+    /// @notice Cast a simple vote (single choice). Reuses _tallies storage.
+    function castSimpleVote(
+        bytes32              pollId,
+        InEuint32[] calldata weights
+    ) external {
+        Poll storage poll = polls[pollId];
+        require(poll.exists,                        "Poll not found");
+        require(poll.pollType == 2,                 "Not a simple poll");
+        require(block.number <= poll.endBlock,      "Poll closed");
+        require(!hasVoted[pollId][msg.sender],      "Already voted");
+        require(weights.length == poll.optionCount, "Wrong option count");
+
+        if (poll.credType != 0) {
+            Credential storage cred = credentials[msg.sender][poll.communityId];
+            require(cred.exists,                 "No credential");
+            require(block.number <= cred.expiry, "Credential expired");
+        }
+
+        for (uint8 i = 0; i < poll.optionCount; i++) {
+            euint32 encWeight = FHE.asEuint32(weights[i]);
+            FHE.allowThis(encWeight);
+            if (euint32.unwrap(_tallies[pollId][i]) == 0) {
+                _tallies[pollId][i] = encWeight;
+            } else {
+                _tallies[pollId][i] = FHE.add(_tallies[pollId][i], encWeight);
+            }
+            FHE.allowThis(_tallies[pollId][i]);
+        }
+
+        hasVoted[pollId][msg.sender] = true;
+        emit VoteCast(pollId, msg.sender);
+    }
 
     function castVote(
         bytes32              pollId,
@@ -290,6 +381,44 @@ contract FhenixPoll is EIP712 {
                 _tallies[pollId][i] = FHE.add(_tallies[pollId][i], encWeight);
             }
             FHE.allowThis(_tallies[pollId][i]);
+        }
+
+        hasVoted[pollId][msg.sender] = true;
+        emit VoteCast(pollId, msg.sender);
+    }
+
+    /// @notice Cast a survey vote. encAnswers is a flat array of encrypted 0/1 values
+    ///         for all questions × answers (ordered by question, then answer within question).
+    function castSurveyVote(
+        bytes32              pollId,
+        InEuint32[] calldata encAnswers
+    ) external {
+        Poll storage poll = polls[pollId];
+        require(poll.exists,                   "Poll not found");
+        require(poll.pollType == 3,            "Not a survey");
+        require(block.number <= poll.endBlock,  "Poll closed");
+        require(!hasVoted[pollId][msg.sender],  "Already voted");
+
+        if (poll.credType != 0) {
+            Credential storage cred = credentials[msg.sender][poll.communityId];
+            require(cred.exists,                 "No credential");
+            require(block.number <= cred.expiry, "Credential expired");
+        }
+
+        uint16 idx = 0;
+        for (uint8 q = 1; q <= poll.optionCount; q++) {
+            SurveyQuestion storage sq = surveyQuestions[pollId][q];
+            for (uint8 a = 0; a < sq.answerCount; a++) {
+                euint32 enc = FHE.asEuint32(encAnswers[idx]);
+                FHE.allowThis(enc);
+                if (euint32.unwrap(_surveyTallies[pollId][q][a]) == 0) {
+                    _surveyTallies[pollId][q][a] = enc;
+                } else {
+                    _surveyTallies[pollId][q][a] = FHE.add(_surveyTallies[pollId][q][a], enc);
+                }
+                FHE.allowThis(_surveyTallies[pollId][q][a]);
+                idx++;
+            }
         }
 
         hasVoted[pollId][msg.sender] = true;
@@ -337,7 +466,7 @@ contract FhenixPoll is EIP712 {
         // Roll up plaintext to all ancestors so rolledUpTallies[pollId][parentId]
         // accumulates the sum of itself + all descendants as results are published.
         // _tallies uses 0-based index; pollOptions uses 1-based optionId.
-        if (polls[pollId].isHierarchical) {
+        if (polls[pollId].pollType == 1) {
             uint8 parentId = pollOptions[pollId][optionId + 1].parentId;
             while (parentId != 0) {
                 rolledUpTallies[pollId][parentId] += plaintext;
@@ -346,6 +475,46 @@ contract FhenixPoll is EIP712 {
         }
 
         emit TallyPublished(pollId, optionId, plaintext);
+    }
+
+    // ─── Survey Reveal ────────────────────────────────────────────────────────
+
+    function requestSurveyReveal(bytes32 pollId) external {
+        Poll storage poll = polls[pollId];
+        require(poll.exists,                  "Poll not found");
+        require(poll.pollType == 3,           "Not a survey");
+        require(block.number > poll.endBlock, "Poll still open");
+        require(!poll.tallyRevealed,          "Already revealed");
+
+        for (uint8 q = 1; q <= poll.optionCount; q++) {
+            SurveyQuestion storage sq = surveyQuestions[pollId][q];
+            for (uint8 a = 0; a < sq.answerCount; a++) {
+                euint32 tally = _surveyTallies[pollId][q][a];
+                if (euint32.unwrap(tally) == 0) continue;
+                surveyCtHashes[pollId][q][a] = euint32.unwrap(tally);
+                FHE.allowPublic(tally);
+            }
+        }
+        poll.tallyRevealed = true;
+        emit TallyRevealed(pollId, poll.optionCount);
+    }
+
+    function publishSurveyResult(
+        bytes32 pollId,
+        uint8   questionId,
+        uint8   answerId,
+        uint32  plaintext,
+        bytes calldata signature
+    ) external {
+        require(polls[pollId].tallyRevealed, "Reveal not requested");
+        euint32 tally = _surveyTallies[pollId][questionId][answerId];
+        if (euint32.unwrap(tally) == 0) {
+            surveyRevealedTallies[pollId][questionId][answerId] = 0;
+        } else {
+            FHE.publishDecryptResult(tally, plaintext, signature);
+            surveyRevealedTallies[pollId][questionId][answerId] = plaintext;
+        }
+        emit TallyPublished(pollId, questionId, plaintext);
     }
 
     // ─── Credentials ──────────────────────────────────────────────────────────
@@ -549,5 +718,13 @@ contract FhenixPoll is EIP712 {
 
     function getQuest(bytes32 questId) external view returns (Quest memory) {
         return quests[questId];
+    }
+
+    function getSurveyQuestion(bytes32 pollId, uint8 questionId) external view returns (SurveyQuestion memory) {
+        return surveyQuestions[pollId][questionId];
+    }
+
+    function getSurveyRevealedTally(bytes32 pollId, uint8 questionId, uint8 answerId) external view returns (uint32) {
+        return surveyRevealedTallies[pollId][questionId][answerId];
     }
 }

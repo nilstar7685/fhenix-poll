@@ -394,7 +394,7 @@ describe('FhenixPoll', () => {
       ).to.emit(contract, 'PollCreated');
 
       const poll = await contract.getPoll(HIER_POLL_ID);
-      expect(poll.isHierarchical).to.be.true;
+      expect(poll.pollType).to.equal(1);
       expect(poll.optionCount).to.equal(12);
 
       // Root option 1 should have 2 children (options 5 and 6)
@@ -597,6 +597,208 @@ describe('FhenixPoll', () => {
       await createQuest();
       const ids = await contract.getCommunityQuestIds(COMMUNITY_ID);
       expect(ids).to.include(QUEST_ID);
+    });
+  });
+
+  // ── Simple Poll ─────────────────────────────────────────────────────────────
+
+  describe('Simple Poll', () => {
+    const SIMPLE_POLL_ID = ethers.keccak256(ethers.toUtf8Bytes('simple-poll'));
+
+    beforeEach(async () => {
+      await contract.registerCommunity(COMMUNITY_ID, CONFIG_HASH, 0);
+      await contract.createSimplePoll(SIMPLE_POLL_ID, COMMUNITY_ID, 0, 10, 3);
+    });
+
+    it('creates with pollType=2', async () => {
+      const poll = await contract.getPoll(SIMPLE_POLL_ID);
+      expect(poll.pollType).to.equal(2);
+      expect(poll.optionCount).to.equal(3);
+    });
+
+    it('castSimpleVote accumulates into tallies', async () => {
+      const client = await hre.cofhe.createClientWithBatteries(voter);
+      const encrypted = await client
+        .encryptInputs([Encryptable.uint32(0n), Encryptable.uint32(1000000n), Encryptable.uint32(0n)])
+        .execute();
+      await expect(contract.connect(voter).castSimpleVote(SIMPLE_POLL_ID, encrypted))
+        .to.emit(contract, 'VoteCast')
+        .withArgs(SIMPLE_POLL_ID, voter.address);
+    });
+
+    it('rejects castSimpleVote on non-simple poll', async () => {
+      const RANKED_ID = ethers.keccak256(ethers.toUtf8Bytes('ranked-poll'));
+      await contract.createPoll(RANKED_ID, COMMUNITY_ID, 0, 10, 3);
+      const client = await hre.cofhe.createClientWithBatteries(voter);
+      const encrypted = await client
+        .encryptInputs([Encryptable.uint32(0n), Encryptable.uint32(1000000n), Encryptable.uint32(0n)])
+        .execute();
+      await expect(contract.connect(voter).castSimpleVote(RANKED_ID, encrypted))
+        .to.be.revertedWith('Not a simple poll');
+    });
+
+    it('rejects double vote', async () => {
+      const client = await hre.cofhe.createClientWithBatteries(voter);
+      const enc1 = await client
+        .encryptInputs([Encryptable.uint32(0n), Encryptable.uint32(1000000n), Encryptable.uint32(0n)])
+        .execute();
+      await contract.connect(voter).castSimpleVote(SIMPLE_POLL_ID, enc1);
+      const enc2 = await client
+        .encryptInputs([Encryptable.uint32(1000000n), Encryptable.uint32(0n), Encryptable.uint32(0n)])
+        .execute();
+      await expect(contract.connect(voter).castSimpleVote(SIMPLE_POLL_ID, enc2))
+        .to.be.revertedWith('Already voted');
+    });
+
+    it('uses existing requestTallyReveal + publishTallyResult', async () => {
+      const client = await hre.cofhe.createClientWithBatteries(voter);
+      const encrypted = await client
+        .encryptInputs([Encryptable.uint32(500000n), Encryptable.uint32(1000000n), Encryptable.uint32(0n)])
+        .execute();
+      await contract.connect(voter).castSimpleVote(SIMPLE_POLL_ID, encrypted);
+      await mineBlocks(11);
+
+      await contract.requestTallyReveal(SIMPLE_POLL_ID);
+
+      for (let i = 0; i < 3; i++) {
+        const ctHash = await contract.tallyCtHashes(SIMPLE_POLL_ID, i);
+        if (ctHash === ethers.ZeroHash) continue;
+        const plaintext = Number(await mock_getPlaintext(hre.ethers.provider, ctHash));
+        const sig = await signDecryptResult(ctHash, plaintext);
+        await contract.publishTallyResult(SIMPLE_POLL_ID, i, plaintext, sig);
+      }
+
+      expect(await contract.getRevealedTally(SIMPLE_POLL_ID, 0)).to.equal(500000);
+      expect(await contract.getRevealedTally(SIMPLE_POLL_ID, 1)).to.equal(1000000);
+      expect(await contract.getRevealedTally(SIMPLE_POLL_ID, 2)).to.equal(0);
+    });
+  });
+
+  // ── Survey ──────────────────────────────────────────────────────────────────
+
+  describe('Survey', () => {
+    const SURVEY_ID = ethers.keccak256(ethers.toUtf8Bytes('test-survey'));
+
+    beforeEach(async () => {
+      await contract.registerCommunity(COMMUNITY_ID, CONFIG_HASH, 0);
+      await contract.createSurvey(
+        SURVEY_ID, COMMUNITY_ID, 0, 10, 2,
+        [3, 2],
+        [
+          ethers.keccak256(ethers.toUtf8Bytes('Favorite color?')),
+          ethers.keccak256(ethers.toUtf8Bytes('Like pizza?')),
+        ]
+      );
+    });
+
+    it('creates survey with pollType=3 and registers questions', async () => {
+      const poll = await contract.getPoll(SURVEY_ID);
+      expect(poll.pollType).to.equal(3);
+      expect(poll.optionCount).to.equal(2);
+
+      const q1 = await contract.getSurveyQuestion(SURVEY_ID, 1);
+      expect(q1.questionId).to.equal(1);
+      expect(q1.answerCount).to.equal(3);
+      expect(q1.exists).to.be.true;
+
+      const q2 = await contract.getSurveyQuestion(SURVEY_ID, 2);
+      expect(q2.answerCount).to.equal(2);
+    });
+
+    it('rejects invalid question count', async () => {
+      const id2 = ethers.keccak256(ethers.toUtf8Bytes('bad-survey'));
+      await expect(contract.createSurvey(id2, COMMUNITY_ID, 0, 10, 0, [], []))
+        .to.be.revertedWith('Questions: 1-20');
+    });
+
+    it('castSurveyVote accumulates encrypted answers', async () => {
+      const client = await hre.cofhe.createClientWithBatteries(voter);
+      // Q1: pick answer 1 → [0,1,0]; Q2: pick answer 0 → [1,0]
+      const encrypted = await client
+        .encryptInputs([
+          Encryptable.uint32(0n), Encryptable.uint32(1n), Encryptable.uint32(0n),
+          Encryptable.uint32(1n), Encryptable.uint32(0n),
+        ])
+        .execute();
+      await expect(contract.connect(voter).castSurveyVote(SURVEY_ID, encrypted))
+        .to.emit(contract, 'VoteCast')
+        .withArgs(SURVEY_ID, voter.address);
+    });
+
+    it('rejects double survey vote', async () => {
+      const client = await hre.cofhe.createClientWithBatteries(voter);
+      const enc1 = await client
+        .encryptInputs([
+          Encryptable.uint32(0n), Encryptable.uint32(1n), Encryptable.uint32(0n),
+          Encryptable.uint32(1n), Encryptable.uint32(0n),
+        ])
+        .execute();
+      await contract.connect(voter).castSurveyVote(SURVEY_ID, enc1);
+      const enc2 = await client
+        .encryptInputs([
+          Encryptable.uint32(1n), Encryptable.uint32(0n), Encryptable.uint32(0n),
+          Encryptable.uint32(0n), Encryptable.uint32(1n),
+        ])
+        .execute();
+      await expect(contract.connect(voter).castSurveyVote(SURVEY_ID, enc2))
+        .to.be.revertedWith('Already voted');
+    });
+
+    it('requestSurveyReveal + publishSurveyResult', async () => {
+      const client = await hre.cofhe.createClientWithBatteries(voter);
+      const encrypted = await client
+        .encryptInputs([
+          Encryptable.uint32(0n), Encryptable.uint32(1n), Encryptable.uint32(0n),
+          Encryptable.uint32(1n), Encryptable.uint32(0n),
+        ])
+        .execute();
+      await contract.connect(voter).castSurveyVote(SURVEY_ID, encrypted);
+      await mineBlocks(11);
+
+      await contract.requestSurveyReveal(SURVEY_ID);
+      const poll = await contract.getPoll(SURVEY_ID);
+      expect(poll.tallyRevealed).to.be.true;
+
+      // Publish Q1 answers
+      for (let a = 0; a < 3; a++) {
+        const ctHash = await contract.surveyCtHashes(SURVEY_ID, 1, a);
+        if (ctHash === ethers.ZeroHash) continue;
+        const plaintext = Number(await mock_getPlaintext(hre.ethers.provider, ctHash));
+        const sig = await signDecryptResult(ctHash, plaintext);
+        await contract.publishSurveyResult(SURVEY_ID, 1, a, plaintext, sig);
+      }
+
+      expect(await contract.getSurveyRevealedTally(SURVEY_ID, 1, 0)).to.equal(0);
+      expect(await contract.getSurveyRevealedTally(SURVEY_ID, 1, 1)).to.equal(1);
+      expect(await contract.getSurveyRevealedTally(SURVEY_ID, 1, 2)).to.equal(0);
+
+      // Publish Q2 answers
+      for (let a = 0; a < 2; a++) {
+        const ctHash = await contract.surveyCtHashes(SURVEY_ID, 2, a);
+        if (ctHash === ethers.ZeroHash) continue;
+        const plaintext = Number(await mock_getPlaintext(hre.ethers.provider, ctHash));
+        const sig = await signDecryptResult(ctHash, plaintext);
+        await contract.publishSurveyResult(SURVEY_ID, 2, a, plaintext, sig);
+      }
+
+      expect(await contract.getSurveyRevealedTally(SURVEY_ID, 2, 0)).to.equal(1);
+      expect(await contract.getSurveyRevealedTally(SURVEY_ID, 2, 1)).to.equal(0);
+    });
+
+    it('rejects requestSurveyReveal before poll closes', async () => {
+      await expect(contract.requestSurveyReveal(SURVEY_ID))
+        .to.be.revertedWith('Poll still open');
+    });
+
+    it('rejects castSurveyVote on non-survey poll', async () => {
+      const RANKED_ID = ethers.keccak256(ethers.toUtf8Bytes('ranked-for-survey-test'));
+      await contract.createPoll(RANKED_ID, COMMUNITY_ID, 0, 10, 3);
+      const client = await hre.cofhe.createClientWithBatteries(voter);
+      const encrypted = await client
+        .encryptInputs([Encryptable.uint32(1n), Encryptable.uint32(0n), Encryptable.uint32(0n)])
+        .execute();
+      await expect(contract.connect(voter).castSurveyVote(RANKED_ID, encrypted))
+        .to.be.revertedWith('Not a survey');
     });
   });
 });
