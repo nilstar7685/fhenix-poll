@@ -106,7 +106,7 @@ export async function getPoll(pollId: `0x${string}`) {
     id: `0x${string}`; communityId: `0x${string}`; creator: `0x${string}`;
     credType: number; startBlock: number; endBlock: number;
     optionCount: number; tallyRevealed: boolean; exists: boolean;
-    isHierarchical: boolean
+    pollType: number
   }>
 }
 
@@ -152,6 +152,33 @@ export async function getRevealedTally(
     args:    [pollId, optionId],
   })
   return BigInt(result as number)
+}
+
+export async function getSurveyRevealedTally(
+  pollId: `0x${string}`,
+  questionId: number,
+  answerId: number,
+): Promise<bigint> {
+  const result = await readContract({
+    address: CONTRACT_ADDRESS,
+    abi:     FHENIX_POLL_ABI,
+    functionName: 'getSurveyRevealedTally',
+    args:    [pollId, questionId, answerId],
+  })
+  return BigInt(result as number)
+}
+
+export async function getSurveyQuestion(
+  pollId: `0x${string}`,
+  questionId: number,
+): Promise<{ questionId: number; answerCount: number; exists: boolean }> {
+  const result = await readContract({
+    address: CONTRACT_ADDRESS,
+    abi:     FHENIX_POLL_ABI,
+    functionName: 'getSurveyQuestion',
+    args:    [pollId, questionId],
+  })
+  return result as { questionId: number; answerCount: number; exists: boolean }
 }
 
 export async function getTallyCtHash(

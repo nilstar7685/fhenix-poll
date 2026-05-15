@@ -10,7 +10,7 @@ interface FeedItem {
   poll: PollInfo
 }
 
-type FeedFilter = 'polls' | 'communities'
+type FeedFilter = 'polls' | 'surveys' | 'communities'
 
 export default function PollFeed() {
   const [communities, setCommunities] = useState<CommunityConfig[]>([])
@@ -49,6 +49,12 @@ export default function PollFeed() {
             Create a Poll
           </Link>
           <Link
+            to="/create-survey"
+            className="bg-[#0070F3] hover:bg-blue-600 text-white px-6 py-3 rounded-full text-sm font-medium transition-colors shadow-sm"
+          >
+            Create Survey
+          </Link>
+          <Link
             to="/create"
             className="border border-gray-200 hover:border-gray-300 bg-white text-gray-700 px-6 py-3 rounded-full text-sm font-medium transition-colors"
           >
@@ -64,18 +70,18 @@ export default function PollFeed() {
           <div className="flex items-center gap-2.5">
             <div className="w-2.5 h-2.5 rounded-full bg-[#0070F3]" />
             <h2 className="text-sm font-semibold text-gray-900 tracking-tight">
-              {filter === 'polls' ? 'Active Polls' : 'Communities'}
+              {filter === 'polls' ? 'Active Polls' : filter === 'surveys' ? 'Active Surveys' : 'Communities'}
             </h2>
             {!loading && (
               <span className="text-sm font-medium text-gray-400">
-                {filter === 'polls' ? feedItems.length : communities.length}
+                {filter === 'polls' ? feedItems.filter(f => f.poll.poll_type !== 'survey').length : filter === 'surveys' ? feedItems.filter(f => f.poll.poll_type === 'survey').length : communities.length}
               </span>
             )}
           </div>
 
           {/* Filter tabs */}
           <div className="flex items-center bg-white border border-gray-100 rounded-xl p-1 shadow-sm">
-            {(['polls', 'communities'] as const).map(f => (
+            {(['polls', 'surveys', 'communities'] as const).map(f => (
               <button
                 key={f}
                 onClick={() => setFilter(f)}
@@ -107,24 +113,31 @@ export default function PollFeed() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} />)}
           </div>
-        ) : filter === 'polls' ? (
-          feedItems.length === 0 ? (
-            <EmptyState />
-          ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              {feedItems.map(({ community, poll }) => (
-                <PollCard
-                  key={poll.poll_id}
-                  communityId={community.community_id}
-                  communityName={community.name}
-                  poll={poll}
-                />
-              ))}
-            </div>
-          )
+        ) : filter === 'polls' || filter === 'surveys' ? (
+          (() => {
+            const filtered = filter === 'surveys'
+              ? feedItems.filter(f => f.poll.poll_type === 'survey')
+              : feedItems.filter(f => f.poll.poll_type !== 'survey')
+            return filtered.length === 0 ? (
+              filter === 'surveys'
+                ? <EmptyState message="No surveys yet." description="Create an anonymous survey with FHE-encrypted responses. Only aggregate results are revealed." cta={{ label: 'Create Survey', to: '/create-survey' }} />
+                : <EmptyState />
+            ) : (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {filtered.map(({ community, poll }) => (
+                  <PollCard
+                    key={poll.poll_id}
+                    communityId={community.community_id}
+                    communityName={community.name}
+                    poll={poll}
+                  />
+                ))}
+              </div>
+            )
+          })()
         ) : (
           communities.length === 0 ? (
-            <EmptyState message="No communities yet." cta={{ label: '+ Create Community', to: '/create' }} />
+            <EmptyState message="No communities yet." description="Communities group polls and surveys. Create one to get started." cta={{ label: 'Create Community', to: '/create' }} />
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               {communities.map(c => (
@@ -159,7 +172,7 @@ export default function PollFeed() {
   )
 }
 
-function EmptyState({ message = 'No polls yet.', cta }: { message?: string; cta?: { label: string; to: string } }) {
+function EmptyState({ message = 'No polls yet.', description, cta }: { message?: string; description?: string; cta?: { label: string; to: string } }) {
   return (
     <div className="bg-white rounded-2xl border border-gray-100 p-12 text-center shadow-sm">
       {/* Abstract bar chart illustration */}
@@ -178,17 +191,21 @@ function EmptyState({ message = 'No polls yet.', cta }: { message?: string; cta?
       </div>
       <h3 className="text-lg font-semibold text-gray-900 mb-2">{message}</h3>
       <p className="text-sm text-gray-500 mb-6 max-w-xs mx-auto">
-        Create a community, then add a ranked-choice poll to get started.
+        {description ?? 'Create a community, then add a ranked-choice poll to get started.'}
       </p>
       <div className="flex gap-3 justify-center flex-wrap">
-        <Link to="/create" className="border border-gray-200 text-gray-700 px-5 py-2.5 rounded-full text-sm font-medium hover:bg-gray-50 transition-colors">
-          Create Community
-        </Link>
-        <Link to="/create-poll" className="bg-gray-900 text-white px-5 py-2.5 rounded-full text-sm font-medium hover:bg-gray-800 transition-colors">
-          Create Poll
-        </Link>
+        {!cta && (
+          <Link to="/create" className="border border-gray-200 text-gray-700 px-5 py-2.5 rounded-full text-sm font-medium hover:bg-gray-50 transition-colors">
+            Create Community
+          </Link>
+        )}
+        {!cta && (
+          <Link to="/create-poll" className="bg-gray-900 text-white px-5 py-2.5 rounded-full text-sm font-medium hover:bg-gray-800 transition-colors">
+            Create Poll
+          </Link>
+        )}
         {cta && (
-          <Link to={cta.to} className="bg-[#0070F3] text-white px-5 py-2.5 rounded-full text-sm font-medium hover:bg-blue-600 transition-colors">
+          <Link to={cta.to} className="border border-gray-200 text-gray-700 px-5 py-2.5 rounded-full text-sm font-medium hover:bg-gray-50 transition-colors">
             {cta.label}
           </Link>
         )}

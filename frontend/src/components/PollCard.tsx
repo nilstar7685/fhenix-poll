@@ -47,7 +47,7 @@ export default function PollCard({ communityId, communityName, poll }: Props) {
 
   return (
     <Link
-      to={`/communities/${communityId}/polls/${poll.poll_id}`}
+      to={poll.poll_type === 'survey' ? `/communities/${communityId}/surveys/${poll.poll_id}` : `/communities/${communityId}/polls/${poll.poll_id}`}
       className="border border-gray-100 bg-white rounded-[1.25rem] p-5 hover:border-gray-200 hover:shadow-[0_4px_20px_-10px_rgba(0,0,0,0.08)] transition-all group flex flex-col justify-between min-h-[160px] block"
     >
       <div>

@@ -6,7 +6,7 @@ import CredentialHub from '../components/CredentialHub'
 import PollCard from '../components/PollCard'
 import type { CommunityConfig, PollInfo } from '../types'
 
-type Tab = 'polls' | 'posts' | 'quests'
+type Tab = 'polls' | 'surveys' | 'posts'
 
 export default function CommunityDetail() {
   const { id } = useParams<{ id: string }>()
@@ -87,6 +87,24 @@ export default function CommunityDetail() {
               Poll
             </Link>
           )}
+          {tab === 'surveys' && (
+            <Link to={`/create-survey?community=${community.community_id}`}
+              className="shrink-0 flex items-center gap-1.5 text-xs font-medium bg-gray-900 text-white px-3.5 py-2 rounded-full hover:bg-gray-800 transition-colors">
+              <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <path d="M12 5v14M5 12h14" strokeLinecap="round"/>
+              </svg>
+              Survey
+            </Link>
+          )}
+          {tab === 'posts' && (
+            <Link to={`/communities/${community.community_id}/posts`}
+              className="shrink-0 flex items-center gap-1.5 text-xs font-medium bg-gray-900 text-white px-3.5 py-2 rounded-full hover:bg-gray-800 transition-colors">
+              <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <path d="M12 5v14M5 12h14" strokeLinecap="round"/>
+              </svg>
+              Post
+            </Link>
+          )}
         </div>
       </div>
 
@@ -94,7 +112,7 @@ export default function CommunityDetail() {
 
       {/* Tabs */}
       <div className="flex gap-1 bg-gray-100 rounded-xl p-1">
-        {(['polls', 'posts', 'quests'] as Tab[]).map(t => (
+        {(['polls', 'surveys', 'posts'] as Tab[]).map(t => (
           <button key={t} onClick={() => setTab(t)}
             className={`flex-1 py-2 text-sm font-medium rounded-lg transition-colors capitalize ${
               tab === t ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
@@ -105,36 +123,35 @@ export default function CommunityDetail() {
       </div>
 
       {tab === 'polls' && (
-        <PollsTab polls={polls} currentBlock={currentBlock}
+        <PollsTab polls={polls.filter(p => p.poll_type !== 'survey')} currentBlock={currentBlock}
           communityId={community.community_id} communityName={community.name} />
       )}
 
+      {tab === 'surveys' && (
+        <PollsTab polls={polls.filter(p => p.poll_type === 'survey')} currentBlock={currentBlock}
+          communityId={community.community_id} communityName={community.name} emptyLabel="survey" />
+      )}
+
       {tab === 'posts' && (
-        <div className="text-center py-4">
+        <div className="text-center py-8">
+          <p className="text-sm text-gray-500 mb-4">Community discussion board</p>
           <Link to={`/communities/${id}/posts`}
             className="inline-flex items-center gap-1.5 bg-gray-900 text-white px-5 py-2.5 rounded-full text-sm font-medium hover:bg-gray-800 transition-colors">
-            View Posts →
+            Open Posts →
           </Link>
         </div>
       )}
 
-      {tab === 'quests' && (
-        <div className="text-center py-4">
-          <Link to={`/communities/${id}/quests`}
-            className="inline-flex items-center gap-1.5 bg-gray-900 text-white px-5 py-2.5 rounded-full text-sm font-medium hover:bg-gray-800 transition-colors">
-            View Quests →
-          </Link>
-        </div>
-      )}
     </div>
   )
 }
 
-function PollsTab({ polls, currentBlock, communityId, communityName }: {
+function PollsTab({ polls, currentBlock, communityId, communityName, emptyLabel = 'poll' }: {
   polls: PollInfo[]
   currentBlock: number
   communityId: string
   communityName: string
+  emptyLabel?: string
 }) {
   const activePolls = polls.filter(p => !p.end_block || currentBlock === 0 || currentBlock <= p.end_block)
   const pastPolls   = polls.filter(p => p.end_block && currentBlock > 0 && currentBlock > p.end_block)
@@ -143,15 +160,15 @@ function PollsTab({ polls, currentBlock, communityId, communityName }: {
     <div>
       <div className="flex items-center gap-2 mb-3">
         <div className="w-2 h-2 rounded-full bg-[#10B981]" />
-        <h2 className="text-sm font-semibold text-gray-900">Active Polls</h2>
+        <h2 className="text-sm font-semibold text-gray-900">Active {emptyLabel === 'survey' ? 'Surveys' : 'Polls'}</h2>
         {activePolls.length > 0 && <span className="text-sm text-gray-400">{activePolls.length}</span>}
       </div>
       {activePolls.length === 0 ? (
         <div className="bg-white border border-gray-100 rounded-2xl p-8 text-center mb-4">
-          <p className="text-sm text-gray-500 mb-4">No active polls.</p>
-          <Link to={`/create-poll?community=${communityId}`}
+          <p className="text-sm text-gray-500 mb-4">No active {emptyLabel}s.</p>
+          <Link to={emptyLabel === 'survey' ? `/create-survey?community=${communityId}` : `/create-poll?community=${communityId}`}
             className="inline-flex items-center gap-1.5 bg-gray-900 text-white px-5 py-2.5 rounded-full text-sm font-medium hover:bg-gray-800 transition-colors">
-            Create first poll →
+            Create first {emptyLabel} →
           </Link>
         </div>
       ) : (
@@ -165,7 +182,7 @@ function PollsTab({ polls, currentBlock, communityId, communityName }: {
         <>
           <div className="flex items-center gap-2 mb-3">
             <div className="w-2 h-2 rounded-full bg-gray-300" />
-            <h2 className="text-sm font-semibold text-gray-500">Past Polls</h2>
+            <h2 className="text-sm font-semibold text-gray-500">Past {emptyLabel === 'survey' ? 'Surveys' : 'Polls'}</h2>
             <span className="text-sm text-gray-400">{pastPolls.length}</span>
           </div>
           <div className="grid grid-cols-1 gap-4 opacity-70">

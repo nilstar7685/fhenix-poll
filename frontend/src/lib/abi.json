@@ -1,5 +1,5 @@
 {
-  "address": "0x9dC0044FdB877F1F017D5853150b0B9725b26397",
+  "address": "0xE663beAE94fc6eF11f8C37c866D439272dEE7e6c",
   "abi": [
     {
       "inputs": [
@@ -303,6 +303,99 @@
       "type": "event"
     },
     {
+      "inputs": [],
+      "name": "MAX_SURVEY_QUESTIONS",
+      "outputs": [
+        {
+          "internalType": "uint8",
+          "name": "",
+          "type": "uint8"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "pollId",
+          "type": "bytes32"
+        },
+        {
+          "components": [
+            {
+              "internalType": "uint256",
+              "name": "ctHash",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint8",
+              "name": "securityZone",
+              "type": "uint8"
+            },
+            {
+              "internalType": "uint8",
+              "name": "utype",
+              "type": "uint8"
+            },
+            {
+              "internalType": "bytes",
+              "name": "signature",
+              "type": "bytes"
+            }
+          ],
+          "internalType": "struct InEuint32[]",
+          "name": "weights",
+          "type": "tuple[]"
+        }
+      ],
+      "name": "castSimpleVote",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "pollId",
+          "type": "bytes32"
+        },
+        {
+          "components": [
+            {
+              "internalType": "uint256",
+              "name": "ctHash",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint8",
+              "name": "securityZone",
+              "type": "uint8"
+            },
+            {
+              "internalType": "uint8",
+              "name": "utype",
+              "type": "uint8"
+            },
+            {
+              "internalType": "bytes",
+              "name": "signature",
+              "type": "bytes"
+            }
+          ],
+          "internalType": "struct InEuint32[]",
+          "name": "encAnswers",
+          "type": "tuple[]"
+        }
+      ],
+      "name": "castSurveyVote",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
       "inputs": [
         {
           "internalType": "bytes32",
@@ -514,6 +607,82 @@
         }
       ],
       "name": "createQuest",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "pollId",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "communityId",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "uint8",
+          "name": "credType",
+          "type": "uint8"
+        },
+        {
+          "internalType": "uint32",
+          "name": "durationBlocks",
+          "type": "uint32"
+        },
+        {
+          "internalType": "uint8",
+          "name": "optionCount",
+          "type": "uint8"
+        }
+      ],
+      "name": "createSimplePoll",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "pollId",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "communityId",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "uint8",
+          "name": "credType",
+          "type": "uint8"
+        },
+        {
+          "internalType": "uint32",
+          "name": "durationBlocks",
+          "type": "uint32"
+        },
+        {
+          "internalType": "uint8",
+          "name": "questionCount",
+          "type": "uint8"
+        },
+        {
+          "internalType": "uint8[]",
+          "name": "answerCounts",
+          "type": "uint8[]"
+        },
+        {
+          "internalType": "bytes32[]",
+          "name": "labelHashes",
+          "type": "bytes32[]"
+        }
+      ],
+      "name": "createSurvey",
       "outputs": [],
       "stateMutability": "nonpayable",
       "type": "function"
@@ -818,9 +987,9 @@
               "type": "bool"
             },
             {
-              "internalType": "bool",
-              "name": "isHierarchical",
-              "type": "bool"
+              "internalType": "uint8",
+              "name": "pollType",
+              "type": "uint8"
             }
           ],
           "internalType": "struct FhenixPoll.Poll",
@@ -1022,6 +1191,81 @@
       "inputs": [
         {
           "internalType": "bytes32",
+          "name": "pollId",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "uint8",
+          "name": "questionId",
+          "type": "uint8"
+        }
+      ],
+      "name": "getSurveyQuestion",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "uint8",
+              "name": "questionId",
+              "type": "uint8"
+            },
+            {
+              "internalType": "uint8",
+              "name": "answerCount",
+              "type": "uint8"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "labelHash",
+              "type": "bytes32"
+            },
+            {
+              "internalType": "bool",
+              "name": "exists",
+              "type": "bool"
+            }
+          ],
+          "internalType": "struct FhenixPoll.SurveyQuestion",
+          "name": "",
+          "type": "tuple"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "pollId",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "uint8",
+          "name": "questionId",
+          "type": "uint8"
+        },
+        {
+          "internalType": "uint8",
+          "name": "answerId",
+          "type": "uint8"
+        }
+      ],
+      "name": "getSurveyRevealedTally",
+      "outputs": [
+        {
+          "internalType": "uint32",
+          "name": "",
+          "type": "uint32"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
           "name": "",
           "type": "bytes32"
         },
@@ -1202,9 +1446,9 @@
           "type": "bool"
         },
         {
-          "internalType": "bool",
-          "name": "isHierarchical",
-          "type": "bool"
+          "internalType": "uint8",
+          "name": "pollType",
+          "type": "uint8"
         }
       ],
       "stateMutability": "view",
@@ -1278,6 +1522,39 @@
         }
       ],
       "name": "publishProgressResult",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "pollId",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "uint8",
+          "name": "questionId",
+          "type": "uint8"
+        },
+        {
+          "internalType": "uint8",
+          "name": "answerId",
+          "type": "uint8"
+        },
+        {
+          "internalType": "uint32",
+          "name": "plaintext",
+          "type": "uint32"
+        },
+        {
+          "internalType": "bytes",
+          "name": "signature",
+          "type": "bytes"
+        }
+      ],
+      "name": "publishSurveyResult",
       "outputs": [],
       "stateMutability": "nonpayable",
       "type": "function"
@@ -1506,6 +1783,19 @@
           "type": "bytes32"
         }
       ],
+      "name": "requestSurveyReveal",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "pollId",
+          "type": "bytes32"
+        }
+      ],
       "name": "requestTallyReveal",
       "outputs": [],
       "stateMutability": "nonpayable",
@@ -1549,6 +1839,103 @@
         }
       ],
       "name": "rolledUpTallies",
+      "outputs": [
+        {
+          "internalType": "uint32",
+          "name": "",
+          "type": "uint32"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "uint8",
+          "name": "",
+          "type": "uint8"
+        },
+        {
+          "internalType": "uint8",
+          "name": "",
+          "type": "uint8"
+        }
+      ],
+      "name": "surveyCtHashes",
+      "outputs": [
+        {
+          "internalType": "bytes32",
+          "name": "",
+          "type": "bytes32"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "uint8",
+          "name": "",
+          "type": "uint8"
+        }
+      ],
+      "name": "surveyQuestions",
+      "outputs": [
+        {
+          "internalType": "uint8",
+          "name": "questionId",
+          "type": "uint8"
+        },
+        {
+          "internalType": "uint8",
+          "name": "answerCount",
+          "type": "uint8"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "labelHash",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "bool",
+          "name": "exists",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "uint8",
+          "name": "",
+          "type": "uint8"
+        },
+        {
+          "internalType": "uint8",
+          "name": "",
+          "type": "uint8"
+        }
+      ],
+      "name": "surveyRevealedTallies",
       "outputs": [
         {
           "internalType": "uint32",
@@ -1636,5 +2023,5 @@
     }
   ],
   "network": "arbitrumSepolia",
-  "deployedAt": "2026-05-03T13:18:24.112Z"
+  "deployedAt": "2026-05-15T06:19:28.368Z"
 }

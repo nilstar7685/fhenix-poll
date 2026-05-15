@@ -82,7 +82,9 @@ function WrongNetworkBanner() {
 
 const NAV = [
   { to: '/polls',       label: 'Polls' },
+  { to: '/surveys',    label: 'Surveys' },
   { to: '/communities', label: 'Communities' },
+  { to: '/activity',   label: 'Activity' },
   { to: '/my-votes',    label: 'My Votes' },
   { to: '/credentials', label: 'Credentials' },
 ]

@@ -16,7 +16,9 @@ import type { VoteCastEvent } from '../hooks/useVoteHistory'
 
 interface StoredSubmission {
   pollId:   string
+  poll_type?: string
   ranking:  Record<string, number>
+  selectedOption?: number | null
   options:  { id: string; label: string; parentId?: number }[]
   votedAt:  number
 }
@@ -100,6 +102,25 @@ function VoteCard({ vote }: { vote: EnrichedVote }) {
 
       {/* My submission */}
       {submission && (() => {
+        // Simple poll — show selected option
+        if (submission.poll_type === 'simple') {
+          const idx = submission.selectedOption
+          const label = idx !== null && idx !== undefined
+            ? submission.options[idx]?.label ?? `Option ${idx + 1}`
+            : null
+          if (!label) return null
+          return (
+            <div className="px-5 pb-3">
+              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1.5">My Choice</p>
+              <span className="text-[11px] bg-green-50 text-green-700 border border-green-100 px-2.5 py-1 rounded-full font-medium inline-flex items-center gap-1.5">
+                <div className="w-2 h-2 rounded-full bg-green-500" />
+                {label}
+              </span>
+            </div>
+          )
+        }
+
+        // Ranked poll — show ranked options
         const ranked = submission.options
           .map(o => ({ ...o, rank: submission.ranking[o.id] ?? 0 }))
           .filter(o => o.rank > 0)

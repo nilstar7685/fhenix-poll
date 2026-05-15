@@ -11,7 +11,7 @@ import { useWriteContract } from '../hooks/useWriteContract'
 import { useConnection } from 'wagmi'
 import { arbitrumSepolia } from '../lib/chains'
 import { getBlockHeight, pollIdFromTitle, publicClient } from '../lib/fhenix'
-import { keccak256, toHex } from 'viem'
+import { keccak256, stringToHex } from 'viem'
 import { getGasFees } from '../lib/gas'
 import { listCommunities, confirmPoll } from '../lib/verifier'
 import { pinPollMetadata } from '../lib/pinata'
@@ -98,10 +98,17 @@ export default function CreatePollWizard() {
   const [title, setTitle]                       = useState('')
   const [description, setDescription]           = useState('')
   const [durationDays, setDurationDays]         = useState(7)
-  const [isHierarchical, setIsHierarchical]     = useState(false)
+  const [pollMode, setPollMode]                 = useState<'flat' | 'hierarchical' | 'simple' | 'survey'>('flat')
+
+  // Backward compat helper
+  const isHierarchical = pollMode === 'hierarchical'
 
   // Step 2
   const [options, setOptions] = useState<OptionDraft[]>([])
+  // Survey mode
+  const [surveyQuestions, setSurveyQuestions] = useState<{ text: string; answers: string[] }[]>([
+    { text: '', answers: ['', ''] }
+  ])
 
   // Step 3
   const [deployStatus, setDeployStatus]   = useState<DeployStatus>('idle')
@@ -185,7 +192,9 @@ export default function CreatePollWizard() {
   }
 
   const step1Valid = communityId.trim() !== '' && title.trim() !== '' && !notCreator
-  const step2Valid = options.length >= 2 && options.every(o => o.label.trim() !== '')
+  const step2Valid = pollMode === 'survey'
+    ? surveyQuestions.length >= 1 && surveyQuestions.every(q => q.text.trim() !== '' && q.answers.length >= 2 && q.answers.every(a => a.trim() !== ''))
+    : options.length >= 2 && options.every(o => o.label.trim() !== '')
 
   async function handleDeploy() {
     if (!isConnected || !address) { setDeployError('Connect your EVM wallet first.'); return }
@@ -206,10 +215,12 @@ export default function CreatePollWizard() {
         community_id:             selectedCommunity.community_id,
         title,
         description:              description.trim() || undefined,
-        options:                  optionList,
+        options:                  pollMode === 'survey' ? [] : optionList,
         required_credential_type: selectedCommunity.credential_type,
         created_at_block:         blockHeight,
         end_block:                blockHeight + durationBlocks,
+        poll_type:                pollMode,
+        ...(pollMode === 'survey' ? { questions: surveyQuestions.map((q, i) => ({ question_id: i + 1, question_text: q.text, answers: q.answers })) } : {}),
       })
 
       // 2. Deploy on-chain
@@ -219,10 +230,9 @@ export default function CreatePollWizard() {
       const { maxFeePerGas, maxPriorityFeePerGas } = await getGasFees()
 
       let hash: `0x${string}`
-      if (isHierarchical) {
-        // parentIds[i] = parent of option (i+1); optionList already has correct parent_option_id
+      if (pollMode === 'hierarchical') {
         const parentIds = optionList.map(o => o.parent_option_id)
-        const labelHashes = optionList.map(o => keccak256(toHex(o.label)))
+        const labelHashes = optionList.map(o => keccak256(stringToHex(o.label)))
 
         hash = await writeContractAsync({
           chain: arbitrumSepolia, account: address,
@@ -236,6 +246,39 @@ export default function CreatePollWizard() {
             options.length,
             parentIds,
             labelHashes,
+          ],
+          maxFeePerGas, maxPriorityFeePerGas,
+        })
+      } else if (pollMode === 'survey') {
+        const answerCounts = surveyQuestions.map(q => q.answers.length)
+        const labelHashes = surveyQuestions.map(q => keccak256(stringToHex(q.text)))
+
+        hash = await writeContractAsync({
+          chain: arbitrumSepolia, account: address,
+          address: CONTRACT_ADDRESS, abi: FHENIX_POLL_ABI,
+          functionName: 'createSurvey',
+          args: [
+            pollId,
+            selectedCommunity.community_id as `0x${string}`,
+            selectedCommunity.credential_type,
+            durationBlocks,
+            surveyQuestions.length,
+            answerCounts,
+            labelHashes,
+          ],
+          maxFeePerGas, maxPriorityFeePerGas,
+        })
+      } else if (pollMode === 'simple') {
+        hash = await writeContractAsync({
+          chain: arbitrumSepolia, account: address,
+          address: CONTRACT_ADDRESS, abi: FHENIX_POLL_ABI,
+          functionName: 'createSimplePoll',
+          args: [
+            pollId,
+            selectedCommunity.community_id as `0x${string}`,
+            selectedCommunity.credential_type,
+            durationBlocks,
+            options.length,
           ],
           maxFeePerGas, maxPriorityFeePerGas,
         })
@@ -265,11 +308,12 @@ export default function CreatePollWizard() {
         community_id:             selectedCommunity.community_id,
         title,
         description:              description.trim() || undefined,
-        options:                  optionList,
+        options:                  pollMode === 'survey' ? [] : optionList,
         required_credential_type: selectedCommunity.credential_type,
         created_at_block:         blockHeight,
         end_block:                blockHeight + durationBlocks,
-        poll_type:                isHierarchical ? 'hierarchical' : 'flat',
+        poll_type:                pollMode,
+        ...(pollMode === 'survey' ? { questions: surveyQuestions.map((q, i) => ({ question_id: i + 1, question_text: q.text, answers: q.answers })) } : {}),
       })
 
       setCreatedPollId(pollId)
@@ -373,22 +417,23 @@ export default function CreatePollWizard() {
                 </div>
                 <p className="text-xs text-gray-400 mt-1.5">Enforced on-chain — votes rejected after this deadline.</p>
               </div>
-              {/* Poll type — card selector matching reference */}
+              {/* Poll type — card selector */}
               <div>
                 <label className={labelCls}>Poll Type</label>
                 <div className="grid grid-cols-2 gap-2">
                   {([
-                    { value: false, label: 'Flat',         desc: 'Root options only.',              icon: '▤' },
-                    { value: true,  label: 'Hierarchical', desc: 'Root + sub-options. Experimental.', icon: '▦' },
-                  ] as const).map(({ value, label, desc, icon }) => (
-                    <button key={label} type="button" onClick={() => setIsHierarchical(value)}
+                    { value: 'flat' as const,          label: 'Ranked',       desc: 'Rank multiple options.',         icon: '▤' },
+                    { value: 'hierarchical' as const,  label: 'Hierarchical', desc: 'Root + sub-options.',            icon: '▦', badge: 'Beta' },
+                    { value: 'simple' as const,        label: 'Simple Poll',  desc: 'Pick exactly one option.',       icon: '◉' },
+                  ]).map(({ value, label, desc, icon, badge }) => (
+                    <button key={value} type="button" onClick={() => setPollMode(value)}
                       className={`flex flex-col items-start gap-1 px-3.5 py-3 rounded-xl border text-left transition-colors ${
-                        isHierarchical === value ? 'border-[#0070F3] bg-blue-50' : 'border-gray-200 bg-gray-50 hover:border-gray-300'
+                        pollMode === value ? 'border-[#0070F3] bg-blue-50' : 'border-gray-200 bg-gray-50 hover:border-gray-300'
                       }`}>
                       <div className="flex items-center gap-1.5">
                         <span className="text-base">{icon}</span>
                         <span className="text-sm font-semibold text-gray-900">{label}</span>
-                        {value && <span className="text-[10px] bg-amber-100 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded-full font-medium">Beta</span>}
+                        {badge && <span className="text-[10px] bg-amber-100 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded-full font-medium">{badge}</span>}
                       </div>
                       <span className="text-xs text-gray-400">{desc}</span>
                     </button>
@@ -402,28 +447,98 @@ export default function CreatePollWizard() {
           {step === 2 && (
             <div className="space-y-4">
               <p className="text-xs text-gray-500 bg-blue-50 border border-blue-100 rounded-xl px-3 py-2.5">
-                {isHierarchical
+                {pollMode === 'hierarchical'
                   ? `Add root options, then click "+ Sub" to nest sub-options (max ${MAX_OPTIONS_HIER_TOTAL} total, ${MAX_OPTIONS_PER_PARENT} per parent, 4 levels deep).`
+                  : pollMode === 'survey'
+                  ? 'Add questions below. Each question needs 2–10 answer options.'
+                  : pollMode === 'simple'
+                  ? `Add 2–${MAX_OPTIONS_FLAT} options. Voters pick exactly one.`
                   : `Add 2–${MAX_OPTIONS_FLAT} options. Voters rank them using FHE-encrypted weights.`}
               </p>
-              <div>
-                {renderOptions(0)}
-              </div>
-              <button
-                type="button"
-                onClick={() => addOption(0)}
-                disabled={
-                  options.length >= (isHierarchical ? MAX_OPTIONS_HIER_TOTAL : MAX_OPTIONS_FLAT) ||
-                  options.filter(o => o.parentDraftId === 0).length >= MAX_OPTIONS_PER_PARENT
-                }
-                className="w-full py-2.5 border border-dashed border-gray-300 rounded-xl text-sm font-medium text-gray-500 hover:border-[#0070F3] hover:text-[#0070F3] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                + Add Option
-              </button>
-              {options.length < 2 && options.length > 0 && (
-                <p className="text-xs text-amber-600 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2">
-                  Add at least 2 options to continue.
-                </p>
+
+              {pollMode === 'survey' ? (
+                <>
+                  {surveyQuestions.map((q, qi) => (
+                    <div key={qi} className="border border-gray-200 rounded-xl p-3 space-y-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-semibold text-gray-500">Q{qi + 1}</span>
+                        <input
+                          type="text" placeholder="Question text"
+                          value={q.text}
+                          onChange={e => {
+                            const copy = [...surveyQuestions]
+                            copy[qi] = { ...copy[qi], text: e.target.value }
+                            setSurveyQuestions(copy)
+                          }}
+                          className="flex-1 px-2 py-1.5 text-sm border border-gray-200 rounded-lg"
+                        />
+                        {surveyQuestions.length > 1 && (
+                          <button type="button" onClick={() => setSurveyQuestions(surveyQuestions.filter((_, i) => i !== qi))}
+                            className="text-red-400 hover:text-red-600 text-xs">✕</button>
+                        )}
+                      </div>
+                      {q.answers.map((a, ai) => (
+                        <div key={ai} className="flex items-center gap-2 ml-6">
+                          <span className="text-xs text-gray-400">{ai + 1}.</span>
+                          <input
+                            type="text" placeholder={`Answer ${ai + 1}`}
+                            value={a}
+                            onChange={e => {
+                              const copy = [...surveyQuestions]
+                              const answers = [...copy[qi].answers]
+                              answers[ai] = e.target.value
+                              copy[qi] = { ...copy[qi], answers }
+                              setSurveyQuestions(copy)
+                            }}
+                            className="flex-1 px-2 py-1 text-sm border border-gray-200 rounded-lg"
+                          />
+                          {q.answers.length > 2 && (
+                            <button type="button" onClick={() => {
+                              const copy = [...surveyQuestions]
+                              copy[qi] = { ...copy[qi], answers: q.answers.filter((_, i) => i !== ai) }
+                              setSurveyQuestions(copy)
+                            }} className="text-red-400 hover:text-red-600 text-xs">✕</button>
+                          )}
+                        </div>
+                      ))}
+                      {q.answers.length < 10 && (
+                        <button type="button" onClick={() => {
+                          const copy = [...surveyQuestions]
+                          copy[qi] = { ...copy[qi], answers: [...q.answers, ''] }
+                          setSurveyQuestions(copy)
+                        }} className="ml-6 text-xs text-blue-500 hover:text-blue-700">+ Add Answer</button>
+                      )}
+                    </div>
+                  ))}
+                  {surveyQuestions.length < 20 && (
+                    <button type="button"
+                      onClick={() => setSurveyQuestions([...surveyQuestions, { text: '', answers: ['', ''] }])}
+                      className="w-full py-2.5 border border-dashed border-gray-300 rounded-xl text-sm font-medium text-gray-500 hover:border-[#0070F3] hover:text-[#0070F3] transition-colors"
+                    >+ Add Question</button>
+                  )}
+                </>
+              ) : (
+                <>
+                  <div>
+                    {renderOptions(0)}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => addOption(0)}
+                    disabled={
+                      options.length >= (isHierarchical ? MAX_OPTIONS_HIER_TOTAL : MAX_OPTIONS_FLAT) ||
+                      options.filter(o => o.parentDraftId === 0).length >= MAX_OPTIONS_PER_PARENT
+                    }
+                    className="w-full py-2.5 border border-dashed border-gray-300 rounded-xl text-sm font-medium text-gray-500 hover:border-[#0070F3] hover:text-[#0070F3] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    + Add Option
+                  </button>
+                  {options.length < 2 && options.length > 0 && (
+                    <p className="text-xs text-amber-600 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2">
+                      Add at least 2 options to continue.
+                    </p>
+                  )}
+                </>
               )}
             </div>
           )}
@@ -437,6 +552,7 @@ export default function CreatePollWizard() {
                     ['Community', selectedCommunity?.name ?? communityId],
                     ['Title', title],
                     ...(description ? [['Description', description]] : []),
+                    ['Poll Type', pollMode === 'simple' ? 'Simple (single choice)' : pollMode === 'hierarchical' ? 'Hierarchical (ranked)' : 'Ranked Choice'],
                     ['Required Credential', `Type ${selectedCommunity?.credential_type ?? 1}`],
                     ['Duration', DEV_MODE ? `${durationDays} block${durationDays !== 1 ? 's' : ''} (dev mode)` : `${durationDays} day${durationDays !== 1 ? 's' : ''} (on-chain enforced)`],
                     ['Options', `${options.length} (${options.map(o => o.label).join(', ')})`],
@@ -501,12 +617,12 @@ export default function CreatePollWizard() {
                 <div className="h-full bg-[#0070F3] rounded-full transition-all" style={{ width: `${progress}%` }} />
               </div>
               <div className="flex gap-3 w-full">
-                {(step > 1 && (deployStatus === 'idle' || deployStatus === 'error')) ? (
+                {(step > 1 && (deployStatus === 'idle' || deployStatus === 'error')) && (
                   <button onClick={() => setStep(s => s - 1)}
                     className="px-6 py-3.5 bg-gray-100 hover:bg-gray-200 text-gray-600 font-medium rounded-xl text-sm transition-colors shrink-0">
                     Back
                   </button>
-                ) : <div className="shrink-0 w-12" />}
+                )}
 
                 {step < 3 ? (
                   (() => {
@@ -526,7 +642,7 @@ export default function CreatePollWizard() {
                   (deployStatus === 'idle' || deployStatus === 'error') && (
                     <button onClick={() => void handleDeploy()} disabled={!isConnected}
                       className="flex-1 py-3.5 bg-[#0070F3] hover:bg-blue-600 text-white font-medium rounded-xl text-sm transition-colors shadow-sm disabled:opacity-60">
-                      {isConnected ? 'Deploy Poll' : 'Connect Wallet'}
+                      {isConnected ? `Deploy ${pollMode === 'simple' ? 'Simple Poll' : pollMode === 'hierarchical' ? 'Hierarchical Poll' : 'Poll'}` : 'Connect Wallet'}
                     </button>
                   )
                 )}

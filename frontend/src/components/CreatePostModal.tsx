@@ -1,22 +1,23 @@
 import { useState } from 'react'
 
 interface Props {
-  onSubmit: (title: string, body: string) => Promise<void>
+  onSubmit: (title: string, body: string, imageUrl?: string) => Promise<void>
   onClose: () => void
 }
 
 export default function CreatePostModal({ onSubmit, onClose }: Props) {
-  const [title, setTitle]     = useState('')
-  const [body, setBody]       = useState('')
-  const [loading, setLoading] = useState(false)
-  const [error, setError]     = useState<string | null>(null)
+  const [title, setTitle]       = useState('')
+  const [body, setBody]         = useState('')
+  const [imageUrl, setImageUrl] = useState('')
+  const [loading, setLoading]   = useState(false)
+  const [error, setError]       = useState<string | null>(null)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!title.trim()) return
     setLoading(true); setError(null)
     try {
-      await onSubmit(title.trim(), body.trim())
+      await onSubmit(title.trim(), body.trim(), imageUrl.trim() || undefined)
       onClose()
     } catch (err: any) {
       setError(err.message ?? 'Failed to create post')
@@ -50,6 +51,19 @@ export default function CreatePostModal({ onSubmit, onClose }: Props) {
               rows={6}
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0070F3]/30 resize-none"
             />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Image URL (optional)</label>
+            <input
+              value={imageUrl} onChange={e => setImageUrl(e.target.value)}
+              placeholder="https://..."
+              type="url"
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0070F3]/30"
+            />
+            {imageUrl.trim() && (
+              <img src={imageUrl} alt="Preview" className="mt-2 rounded-lg max-h-40 object-cover border border-gray-100"
+                onError={e => (e.currentTarget.style.display = 'none')} />
+            )}
           </div>
           {error && <p className="text-xs text-red-500">{error}</p>}
           <div className="flex gap-2 justify-end">

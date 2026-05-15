@@ -8,9 +8,13 @@ interface Props {
   onConfirm: () => void
   onCancel: () => void
   submitting: boolean
+  pollType?: string
+  selectedOption?: number | null
 }
 
-export default function VoteConfirmModal({ ranking, options, onConfirm, onCancel, submitting }: Props) {
+export default function VoteConfirmModal({ ranking, options, onConfirm, onCancel, submitting, pollType, selectedOption }: Props) {
+  const isSimple = pollType === 'simple'
+
   const sorted = Object.entries(ranking)
     .filter(([, r]) => r > 0)
     .sort(([, a], [, b]) => a - b)
@@ -59,14 +63,20 @@ export default function VoteConfirmModal({ ranking, options, onConfirm, onCancel
                 </div>
               </div>
 
-              <span className="text-sm font-medium text-white">Ranked:</span>
-              {sorted.length > 0 ? sorted.map(({ rank, label }) => (
+              <span className="text-sm font-medium text-white">{isSimple ? 'Your Choice:' : 'Ranked:'}</span>
+              {isSimple ? (
+                <span className="text-sm text-gray-300">
+                  {selectedOption !== null && selectedOption !== undefined
+                    ? options[selectedOption]?.label ?? `Option ${selectedOption + 1}`
+                    : 'No option selected'}
+                </span>
+              ) : sorted.length > 0 ? sorted.map(({ rank, label }) => (
                 <span key={rank} className="text-sm text-gray-400">{rank}: {label}</span>
               )) : (
                 <span className="text-sm text-gray-500 italic">No options ranked</span>
               )}
 
-              {unranked.length > 0 && (
+              {!isSimple && unranked.length > 0 && (
                 <>
                   <span className="text-sm font-medium text-white mt-3">Unranked:</span>
                   {unranked.map(o => (
@@ -103,7 +113,9 @@ export default function VoteConfirmModal({ ranking, options, onConfirm, onCancel
 
         {/* Blue info box — attached below modal like ref2 */}
         <div className="bg-[#0070F3] text-white px-5 py-4 text-sm font-medium rounded-b-xl leading-relaxed shadow-xl -mt-2 border-t border-blue-400/30">
-          By clicking "Confirm" you're cryptographically signing your rank order, creating a verifiable ballot that cannot be falsified.
+          {isSimple
+            ? 'By clicking "Confirm" you\'re cryptographically signing your choice. Your selection is FHE-encrypted and cannot be revealed individually.'
+            : 'By clicking "Confirm" you\'re cryptographically signing your rank order, creating a verifiable ballot that cannot be falsified.'}
         </div>
       </div>
     </div>

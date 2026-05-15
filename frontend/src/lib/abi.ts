@@ -106,7 +106,7 @@ export const FHENIX_POLL_ABI = [
         { name: 'optionCount',     type: 'uint8'   },
         { name: 'tallyRevealed',   type: 'bool'    },
         { name: 'exists',          type: 'bool'    },
-        { name: 'isHierarchical',  type: 'bool'    },
+        { name: 'pollType',        type: 'uint8'   },
       ],
     }],
     stateMutability: 'view',
@@ -332,6 +332,94 @@ export const FHENIX_POLL_ABI = [
       { name: 'participant', type: 'address' },
     ],
     outputs: [{ type: 'bytes32' }],
+    stateMutability: 'view',
+  },
+  // Wave 5: Simple Poll + Survey
+  {
+    type: 'function', name: 'createSimplePoll',
+    inputs: [
+      { name: 'pollId',         type: 'bytes32' },
+      { name: 'communityId',    type: 'bytes32' },
+      { name: 'credType',       type: 'uint8'   },
+      { name: 'durationBlocks', type: 'uint32'  },
+      { name: 'optionCount',    type: 'uint8'   },
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function', name: 'castSimpleVote',
+    inputs: [
+      { name: 'pollId',  type: 'bytes32' },
+      { name: 'weights', type: 'tuple[]', components: [
+        { name: 'ctHash',       type: 'uint256' },
+        { name: 'securityZone', type: 'uint8'   },
+        { name: 'utype',        type: 'uint8'   },
+        { name: 'signature',    type: 'bytes'   },
+      ]},
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function', name: 'createSurvey',
+    inputs: [
+      { name: 'pollId',         type: 'bytes32'   },
+      { name: 'communityId',    type: 'bytes32'   },
+      { name: 'credType',       type: 'uint8'     },
+      { name: 'durationBlocks', type: 'uint32'    },
+      { name: 'questionCount',  type: 'uint8'     },
+      { name: 'answerCounts',   type: 'uint8[]'   },
+      { name: 'labelHashes',    type: 'bytes32[]' },
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function', name: 'castSurveyVote',
+    inputs: [
+      { name: 'pollId',     type: 'bytes32' },
+      { name: 'encAnswers', type: 'tuple[]', components: [
+        { name: 'ctHash',       type: 'uint256' },
+        { name: 'securityZone', type: 'uint8'   },
+        { name: 'utype',        type: 'uint8'   },
+        { name: 'signature',    type: 'bytes'   },
+      ]},
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function', name: 'requestSurveyReveal',
+    inputs: [{ name: 'pollId', type: 'bytes32' }],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function', name: 'getSurveyQuestion',
+    inputs: [
+      { name: 'pollId',     type: 'bytes32' },
+      { name: 'questionId', type: 'uint8'   },
+    ],
+    outputs: [{
+      type: 'tuple',
+      components: [
+        { name: 'questionId',  type: 'uint8'   },
+        { name: 'answerCount', type: 'uint8'   },
+        { name: 'labelHash',   type: 'bytes32' },
+        { name: 'exists',      type: 'bool'    },
+      ],
+    }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function', name: 'getSurveyRevealedTally',
+    inputs: [
+      { name: 'pollId',     type: 'bytes32' },
+      { name: 'questionId', type: 'uint8'   },
+      { name: 'answerId',   type: 'uint8'   },
+    ],
+    outputs: [{ type: 'uint32' }],
     stateMutability: 'view',
   },
   // Events

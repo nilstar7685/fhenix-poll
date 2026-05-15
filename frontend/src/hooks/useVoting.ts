@@ -81,7 +81,65 @@ export function useVoting() {
     setStatus('idle'); setTxHash(null); setError(null)
   }, [])
 
-  return { castVote, status, txHash, error, reset }
+  /** Simple poll: encrypt [0,...,votingPower,...,0] at selectedIndex, call castSimpleVote */
+  const castSimple = useCallback(async (
+    pollId: `0x${string}`,
+    selectedIndex: number,
+    optionCount: number,
+    votingPower = 1_000_000,
+  ) => {
+    if (!address || !walletClient) { setError('Wallet not connected'); return }
+    if (!isReady) { setError('CoFHE not ready'); return }
+    setStatus('encrypting'); setError(null); setTxHash(null)
+    try {
+      const rawWeights = new Array(optionCount).fill(0)
+      rawWeights[selectedIndex] = votingPower
+      const encrypted = await cofheClient
+        .encryptInputs(rawWeights.map((w: number) => Encryptable.uint32(BigInt(w))))
+        .execute()
+      const encodedWeights = encrypted.map(e => ({ ctHash: e.ctHash, securityZone: e.securityZone, utype: e.utype, signature: e.signature as `0x${string}` }))
+      setStatus('signing')
+      const { maxFeePerGas, maxPriorityFeePerGas } = await getGasFees()
+      const writeContract = walletClient.writeContract as (...a: any[]) => Promise<`0x${string}`>
+      const hash = await writeContract({
+        chain: arbitrumSepolia, account: address, address: CONTRACT_ADDRESS, abi: FHENIX_POLL_ABI,
+        functionName: 'castSimpleVote', args: [pollId, encodedWeights],
+        maxFeePerGas, maxPriorityFeePerGas,
+      })
+      setTxHash(hash); setStatus('confirming')
+      if (publicClient) await publicClient.waitForTransactionReceipt({ hash })
+      setStatus('done'); return hash
+    } catch (e: unknown) { setError(e instanceof Error ? e.message : String(e)); setStatus('error') }
+  }, [address, walletClient, publicClient, cofheClient, isReady])
+
+  /** Survey: encrypt flat array of 0/1 per question×answer, call castSurveyVote */
+  const castSurvey = useCallback(async (
+    pollId: `0x${string}`,
+    answers: number[], // flat array: for each question, 1 at chosen answer index, 0 elsewhere
+  ) => {
+    if (!address || !walletClient) { setError('Wallet not connected'); return }
+    if (!isReady) { setError('CoFHE not ready'); return }
+    setStatus('encrypting'); setError(null); setTxHash(null)
+    try {
+      const encrypted = await cofheClient
+        .encryptInputs(answers.map(v => Encryptable.uint32(BigInt(v))))
+        .execute()
+      const encoded = encrypted.map(e => ({ ctHash: e.ctHash, securityZone: e.securityZone, utype: e.utype, signature: e.signature as `0x${string}` }))
+      setStatus('signing')
+      const { maxFeePerGas, maxPriorityFeePerGas } = await getGasFees()
+      const writeContract = walletClient.writeContract as (...a: any[]) => Promise<`0x${string}`>
+      const hash = await writeContract({
+        chain: arbitrumSepolia, account: address, address: CONTRACT_ADDRESS, abi: FHENIX_POLL_ABI,
+        functionName: 'castSurveyVote', args: [pollId, encoded],
+        maxFeePerGas, maxPriorityFeePerGas,
+      })
+      setTxHash(hash); setStatus('confirming')
+      if (publicClient) await publicClient.waitForTransactionReceipt({ hash })
+      setStatus('done'); return hash
+    } catch (e: unknown) { setError(e instanceof Error ? e.message : String(e)); setStatus('error') }
+  }, [address, walletClient, publicClient, cofheClient, isReady])
+
+  return { castVote, castSimple, castSurvey, status, txHash, error, reset }
 }
 
 export function computeOptionWeights(

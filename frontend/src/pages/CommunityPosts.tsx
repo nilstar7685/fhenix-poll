@@ -60,6 +60,9 @@ export default function CommunityPosts() {
               </span>
             </div>
             <p className="text-sm text-gray-600 whitespace-pre-wrap leading-relaxed">{post.body}</p>
+            {(post as any).image_url && (
+              <img src={(post as any).image_url} alt="" className="mt-3 rounded-xl max-h-64 object-cover w-full border border-gray-100" />
+            )}
             {post.ipfs_cid && (
               <a
                 href={`https://ipfs.io/ipfs/${post.ipfs_cid}`}

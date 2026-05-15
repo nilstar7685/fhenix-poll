@@ -528,13 +528,11 @@ export default function CreateCommunityWizard() {
               <div className="h-full bg-[#0070F3] rounded-full transition-all" style={{ width: `${progress}%` }} />
             </div>
             <div className="flex gap-3 w-full">
-              {step > 0 ? (
+              {step > 0 && (
                 <button onClick={() => setStep(s => s - 1)}
                   className="px-6 py-3.5 bg-gray-100 hover:bg-gray-200 text-gray-600 font-medium rounded-xl text-sm transition-colors shrink-0">
                   Back
                 </button>
-              ) : (
-                <div className="shrink-0 w-12" />
               )}
               {step < STEPS.length - 1 ? (
                 <button onClick={() => setStep(s => s + 1)} disabled={!canNext}

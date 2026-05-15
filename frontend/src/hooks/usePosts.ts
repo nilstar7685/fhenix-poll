@@ -28,7 +28,7 @@ export function usePosts(communityId: string) {
     }
   }, [communityId])
 
-  const createPost = useCallback(async (title: string, body: string) => {
+  const createPost = useCallback(async (title: string, body: string, imageUrl?: string) => {
     if (!address) throw new Error('Wallet not connected')
 
     // 1. Derive post ID
@@ -43,7 +43,7 @@ export function usePosts(communityId: string) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         post_id: postId, community_id: communityId, author: address,
-        title, body, created_at_block: 0,
+        title, body, image_url: imageUrl, created_at_block: 0,
         content_hash: keccak256(toHex(title + body)),
       }),
     })

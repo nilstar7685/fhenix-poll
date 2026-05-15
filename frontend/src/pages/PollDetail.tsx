@@ -93,7 +93,7 @@ function Stepper({ step }: { step: number }) {
 export default function PollDetail() {
   const { communityId, pollId } = useParams<{ communityId: string; pollId: string }>()
   const { address, isConnected } = useWallet()
-  const { castVote, status, txHash: txId, error } = useVoting()
+  const { castVote, castSimple, status, txHash: txId, error } = useVoting()
   const { signMessageAsync } = useSignMessage()
   const toast = useToast()
 
@@ -109,6 +109,7 @@ export default function PollDetail() {
 
   const [tab, setTab]             = useState<'browse' | 'vote'>('browse')
   const [ranking, setRanking]     = useState<VoteRanking>({})
+  const [selectedOption, setSelectedOption] = useState<number | null>(null)
   const [showConfirm, setShowConfirm] = useState(false)
   const [noCredential, setNoCredential] = useState<'missing' | 'sync' | null>(null)
 
@@ -150,7 +151,7 @@ export default function PollDetail() {
         // Use on-chain endBlock as source of truth; fall back to local only if no on-chain data
         end_block:                onChainPoll?.exists ? Number(onChainPoll.endBlock) : backendPoll?.end_block,
         options,
-        poll_type:                (onChainPoll?.isHierarchical || backendPoll?.poll_type === 'hierarchical') ? 'hierarchical' : 'flat',
+        poll_type:                (onChainPoll?.pollType === 1 || backendPoll?.poll_type === 'hierarchical') ? 'hierarchical' : (onChainPoll?.pollType === 2 ? 'simple' : (onChainPoll?.pollType === 3 ? 'survey' : 'flat')),
       })
 
       setCommunity(community ?? null)
@@ -177,7 +178,9 @@ export default function PollDetail() {
     const votedAt = Date.now()
     const submissionData = {
       pollId:  pollId!,
-      ranking,
+      poll_type: poll.poll_type,
+      ranking: poll.poll_type === 'simple' ? { [String((selectedOption ?? 0) + 1)]: 1 } : ranking,
+      selectedOption: poll.poll_type === 'simple' ? selectedOption : undefined,
       options: poll.options.map(o => ({ id: o.option_id, label: o.label, parentId: o.parent_option_id })),
       votedAt,
     }
@@ -247,7 +250,11 @@ export default function PollDetail() {
     if (!communityId || !pollId || !address) return
     setShowConfirm(false)
     setNoCredential(null)
-    await castVote(pollId as `0x${string}`, ranking, poll!.options.length)
+    if (poll!.poll_type === 'simple' && selectedOption !== null) {
+      await castSimple(pollId as `0x${string}`, selectedOption, poll!.options.length)
+    } else {
+      await castVote(pollId as `0x${string}`, ranking, poll!.options.length)
+    }
     // Status effects handled by useEffect above
   }
 
@@ -351,7 +358,7 @@ export default function PollDetail() {
           <div className="px-6 pb-4 flex items-center justify-between">
             <div>
               <h1 className="text-xl font-semibold tracking-tight text-gray-900">
-                {tab === 'browse' ? 'Browse Options' : 'Rank Your Choices'}
+                {tab === 'browse' ? 'Browse Options' : poll.poll_type === 'simple' ? 'Pick Your Choice' : 'Rank Your Choices'}
               </h1>
               <p className="text-xs text-gray-400 mt-0.5">
                 {communityId?.slice(0, 12)}…
@@ -459,6 +466,31 @@ export default function PollDetail() {
                   Click › to explore sub-options. Connect wallet to vote.
                 </div>
               </div>
+            ) : poll.poll_type === 'simple' ? (
+              /* Simple poll — radio button single choice */
+              <div className="border border-gray-100 rounded-xl overflow-hidden bg-white shadow-sm">
+                <div className="px-4 py-3 border-b border-gray-100 bg-gray-50">
+                  <p className="text-xs text-gray-400 font-medium">Select one option</p>
+                </div>
+                <div className="p-3 flex flex-col gap-1.5">
+                  {poll.options.map((opt, idx) => (
+                    <button key={opt.option_id} type="button"
+                      onClick={() => setSelectedOption(idx)}
+                      className={`flex items-center gap-3 px-4 py-3 rounded-xl border text-left transition-all ${
+                        selectedOption === idx
+                          ? 'border-[#0070F3] bg-blue-50'
+                          : 'border-gray-100 hover:border-gray-200'
+                      }`}>
+                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${
+                        selectedOption === idx ? 'border-[#0070F3]' : 'border-gray-300'
+                      }`}>
+                        {selectedOption === idx && <div className="w-2.5 h-2.5 rounded-full bg-[#0070F3]" />}
+                      </div>
+                      <span className="text-sm font-medium text-gray-900">{opt.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
             ) : (
               <div className="border border-gray-100 rounded-xl overflow-hidden bg-white flex flex-col shadow-sm">
                 {/* Same breadcrumb nav as Browse so user can drill into sub-options */}
@@ -513,10 +545,12 @@ export default function PollDetail() {
 
                 <div className="w-full flex items-center justify-between text-sm">
                   <span className="font-medium text-gray-900">
-                    {hasRanked ? `${rankedCount} option${rankedCount !== 1 ? 's' : ''} ranked` : 'Tap options to rank them'}
+                    {poll?.poll_type === 'simple'
+                      ? (selectedOption !== null ? `Selected: ${poll.options[selectedOption]?.label}` : 'Tap an option to select')
+                      : (hasRanked ? `${rankedCount} option${rankedCount !== 1 ? 's' : ''} ranked` : 'Tap options to rank them')}
                   </span>
-                  {hasRanked && (
-                    <button onClick={() => setRanking({})}
+                  {(poll?.poll_type === 'simple' ? selectedOption !== null : hasRanked) && (
+                    <button onClick={() => { setRanking({}); setSelectedOption(null) }}
                       className="text-xs text-gray-400 hover:text-gray-600 transition-colors">
                       Clear
                     </button>
@@ -533,7 +567,7 @@ export default function PollDetail() {
                   </button>
                   <button
                     onClick={() => setShowConfirm(true)}
-                    disabled={!hasRanked || status === 'encrypting' || status === 'signing' || status === 'confirming'}
+                    disabled={!(poll?.poll_type === 'simple' ? selectedOption !== null : hasRanked) || status === 'encrypting' || status === 'signing' || status === 'confirming'}
                     className="flex-1 py-3 bg-[#0070F3] hover:bg-blue-600 text-white font-medium rounded-xl text-sm transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   >
                     {(status === 'encrypting' || status === 'signing' || status === 'confirming') && (
@@ -552,6 +586,8 @@ export default function PollDetail() {
         <VoteConfirmModal
           ranking={ranking}
           options={poll.options}
+          pollType={poll.poll_type}
+          selectedOption={selectedOption}
           submitting={status === 'signing'}
           onConfirm={() => void handleConfirmVote()}
           onCancel={() => setShowConfirm(false)}

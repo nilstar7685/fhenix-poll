@@ -9,7 +9,7 @@ import { useParams, Link } from 'react-router-dom'
 import { useWriteContract } from '../hooks/useWriteContract'
 import { useConnection } from 'wagmi'
 import { arbitrumSepolia } from '../lib/chains'
-import { getPoll, getRevealedTally, getRolledUpTally, getTallyCtHash, getBlockHeight, publicClient } from '../lib/fhenix'
+import { getPoll, getRevealedTally, getRolledUpTally, getTallyCtHash, getBlockHeight, getSurveyRevealedTally, getSurveyQuestion, publicClient } from '../lib/fhenix'
 import { getGasFees, estimateRequestTallyRevealGas, estimatePublishTallyResultGas } from '../lib/gas'
 import { getCommunityById } from '../lib/verifier'
 import { FHENIX_POLL_ABI, CONTRACT_ADDRESS } from '../lib/abi'
@@ -90,6 +90,8 @@ export default function PollResults() {
   const [tallyRevealed, setTallyRevealed] = useState(false)
   const [optionCount, setOptionCount]     = useState(0)
   const [isHierarchical, setIsHierarchical] = useState(false)
+  const [isSurvey, setIsSurvey] = useState(false)
+  const [surveyResults, setSurveyResults] = useState<Array<{ questionText: string; answers: Array<{ label: string; count: number }> }>>([])
   const [pollCreator, setPollCreator]     = useState<string | null>(null)
   const [pollClosed, setPollClosed]       = useState(false)
   const [tally, setTally]                 = useState<TallyEntry[]>([])
@@ -121,7 +123,8 @@ export default function PollResults() {
         setOptionCount(onChainPoll.optionCount)
         setPollCreator(onChainPoll.creator)
         setTallyRevealed(onChainPoll.tallyRevealed)
-        setIsHierarchical(onChainPoll.isHierarchical)
+        setIsHierarchical(onChainPoll.pollType === 1)
+        setIsSurvey(onChainPoll.pollType === 3)
 
         console.log('[PollResults] getting block height...')
         const currentBlock = await getBlockHeight()
@@ -138,7 +141,7 @@ export default function PollResults() {
               const optId = i + 1
               const [count, rolledUp] = await Promise.all([
                 getRevealedTally(pollId as `0x${string}`, i).catch(() => 0n),
-                onChainPoll.isHierarchical
+                onChainPoll.pollType === 1
                   ? getRolledUpTally(pollId as `0x${string}`, i).catch(() => 0n)
                   : Promise.resolve(undefined),
               ])
@@ -155,6 +158,27 @@ export default function PollResults() {
 
           setTally(results.sort((a, b) => (b.count > a.count ? 1 : -1)))
           console.log('[PollResults] tally set', results.length, 'entries')
+
+          // For surveys, also fetch per-question results
+          if (onChainPoll.pollType === 3) {
+            const backendPoll = (comm as any)?.polls?.find((p: any) => p.poll_id === pollId)
+            const questions = backendPoll?.questions ?? []
+            const surveyData = await Promise.all(
+              Array.from({ length: onChainPoll.optionCount }, async (_, qi) => {
+                const qOnChain = await getSurveyQuestion(pollId as `0x${string}`, qi + 1).catch(() => null)
+                const answerCount = qOnChain?.answerCount ?? 0
+                const qMeta = questions[qi]
+                const answerResults = await Promise.all(
+                  Array.from({ length: answerCount }, async (_, ai) => {
+                    const count = await getSurveyRevealedTally(pollId as `0x${string}`, qi + 1, ai).catch(() => 0n)
+                    return { label: qMeta?.answers?.[ai] ?? `Answer ${ai + 1}`, count: Number(count) }
+                  })
+                )
+                return { questionText: qMeta?.question_text ?? `Question ${qi + 1}`, answers: answerResults }
+              })
+            )
+            setSurveyResults(surveyData)
+          }
         }
       }
     }).catch(console.error).finally(() => {
@@ -189,11 +213,17 @@ export default function PollResults() {
       setRevealStatus('publishing')
       setPublishProgress({ done: 0, total: optionCount })
 
+      let hasAnyVotes = false
       for (let i = 0; i < optionCount; i++) {
-        // Read ctHash stored by requestTallyReveal (bytes32 → bigint for SDK)
         const ctHash = await getTallyCtHash(pollId as `0x${string}`, i)
 
-        // Ask Threshold Network to sign the decryption (no permit needed — FHE.allowPublic was called)
+        // Zero ctHash means no votes for this option — skip decryption, publish 0
+        if (ctHash === 0n) {
+          setPublishProgress(prev => ({ ...prev, done: prev.done + 1 }))
+          continue
+        }
+
+        hasAnyVotes = true
         const { cofheClient } = await import('../lib/cofhe')
         const { decryptedValue, signature } = await cofheClient
           .decryptForTx(ctHash)
@@ -221,9 +251,19 @@ export default function PollResults() {
       }
 
       setRevealStatus('done')
+      if (!hasAnyVotes) {
+        setRevealError('No votes were cast in this poll.')
+        setRevealStatus('error')
+        return
+      }
       setTimeout(() => window.location.reload(), 2_000)
     } catch (e: unknown) {
-      setRevealError(e instanceof Error ? e.message : String(e))
+      const msg = e instanceof Error ? e.message : String(e)
+      if (msg.includes('403') || msg.includes('decrypt')) {
+        setRevealError('No votes were cast — nothing to decrypt.')
+      } else {
+        setRevealError(msg)
+      }
       setRevealStatus('error')
     }
   }
@@ -238,17 +278,17 @@ export default function PollResults() {
   const title = backendPoll?.title ?? pollId?.slice(0, 10) + '…'
 
   // Check if tally is revealed but results not yet published
-  const allPublished = tally.length > 0 && tally.every(e => e.count > 0n)
+  const allPublished = tally.length > 0 && tally.length >= optionCount
   console.log('[PollResults] render: loading=', loading, 'tallyRevealed=', tallyRevealed, 'tally.length=', tally.length)
 
   return (
     <div className="max-w-lg mx-auto w-full">
-      <Link to={`/communities/${communityId}/polls/${pollId}`}
+      <Link to={isSurvey ? `/communities/${communityId}/surveys/${pollId}` : `/communities/${communityId}/polls/${pollId}`}
         className="inline-flex items-center text-sm font-medium text-gray-500 hover:text-gray-900 mb-4 transition-colors group">
         <svg className="w-4 h-4 mr-1 group-hover:-translate-x-0.5 transition-transform" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
           <path d="M15 18l-6-6 6-6" strokeLinecap="round" strokeLinejoin="round"/>
         </svg>
-        Back to Poll
+        {isSurvey ? 'Back to Survey' : 'Back to Poll'}
       </Link>
 
       {loading ? (
@@ -280,7 +320,45 @@ export default function PollResults() {
           </div>
 
           {/* Tally results */}
-          {tallyRevealed && tally.length > 0 ? (
+          {tallyRevealed && isSurvey && surveyResults.length > 0 ? (
+            <div className="space-y-4">
+              {surveyResults.map((q, qi) => {
+                const maxCount = Math.max(...q.answers.map(a => a.count), 1)
+                const total = q.answers.reduce((s, a) => s + a.count, 0)
+                return (
+                  <div key={qi} className="border border-gray-100 rounded-xl overflow-hidden bg-white shadow-sm">
+                    <div className="px-5 py-3 border-b border-gray-100 bg-gray-50">
+                      <p className="text-sm font-medium text-gray-900">
+                        <span className="text-xs text-gray-400 mr-2">Q{qi + 1}</span>
+                        {q.questionText}
+                      </p>
+                      {total > 0 && <p className="text-xs text-gray-400 mt-0.5">{total} response{total !== 1 ? 's' : ''}</p>}
+                    </div>
+                    <div className="p-4 space-y-2.5">
+                      {q.answers.map((a, ai) => {
+                        const pct = total > 0 ? Math.round((a.count / total) * 100) : 0
+                        return (
+                          <div key={ai}>
+                            <div className="flex justify-between items-center mb-1">
+                              <span className="text-sm text-gray-700">{a.label}</span>
+                              <span className="text-xs font-medium text-gray-500">{a.count} ({pct}%)</span>
+                            </div>
+                            <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                              <div className="h-full bg-[#0070F3] rounded-full transition-all"
+                                style={{ width: `${maxCount > 0 ? (a.count / maxCount) * 100 : 0}%` }} />
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )
+              })}
+              <div className="bg-[#0070F3] text-white px-5 py-3.5 text-sm font-medium rounded-xl">
+                FHE decryption by the Fhenix network. Individual responses were never revealed.
+              </div>
+            </div>
+          ) : tallyRevealed && tally.length > 0 ? (
             <div className="border-[1.5px] border-[#0070F3] rounded-xl overflow-hidden bg-white shadow-sm">
               <div className="px-5 py-4 border-b border-gray-100">
                 <h2 className="text-sm font-semibold text-gray-900">FHE-Decrypted Tally</h2>
@@ -301,40 +379,16 @@ export default function PollResults() {
               </div>
             </div>
           ) : tallyRevealed && tally.length === 0 ? (
-            /* Tally revealed but not yet published — show publish button for anyone */
-            <div className="border-[1.5px] border-[#0070F3] rounded-xl overflow-hidden bg-white shadow-sm">
+            /* Tally revealed but not yet published — or no votes at all */
+            <div className="border-[1.5px] border-gray-200 rounded-xl overflow-hidden bg-white shadow-sm">
               <div className="p-6 text-center">
-                <div className="w-10 h-10 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-3">
-                  <span className="text-blue-500 text-lg">🔓</span>
+                <div className="w-10 h-10 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-3">
+                  <span className="text-gray-400 text-lg">—</span>
                 </div>
-                <p className="text-sm font-medium text-gray-700">Decryption requested.</p>
+                <p className="text-sm font-medium text-gray-700">No votes were cast.</p>
                 <p className="text-xs text-gray-400 mt-1 max-w-xs mx-auto">
-                  The Threshold Network has the decrypted values ready. Click below to publish them on-chain.
+                  This poll closed without any votes. There are no results to display.
                 </p>
-              </div>
-
-              {isConnected && revealStatus !== 'done' && (
-                <div className="px-5 pb-5 text-center">
-                  <button
-                    onClick={() => void handleReveal()}
-                    disabled={revealStatus === 'publishing'}
-                    className="inline-flex items-center gap-2 bg-[#0070F3] hover:bg-blue-600 text-white font-medium px-5 py-2.5 rounded-xl text-sm transition-colors shadow-sm disabled:opacity-60"
-                  >
-                    {revealStatus === 'publishing' && (
-                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    )}
-                    {revealStatus === 'publishing'
-                      ? `Publishing ${publishProgress.done}/${publishProgress.total}…`
-                      : 'Publish Results'}
-                  </button>
-                  {revealError && (
-                    <p className="text-xs text-red-500 mt-2">{revealError}</p>
-                  )}
-                </div>
-              )}
-
-              <div className="bg-[#0070F3] text-white px-5 py-3.5 text-sm font-medium">
-                Anyone can publish the Threshold Network's signed decrypt results.
               </div>
             </div>
           ) : (
