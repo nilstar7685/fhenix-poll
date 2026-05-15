@@ -231,6 +231,28 @@ function RequirementEditor({ req, onChange, onRemove }: {
               value={req.params.minFollowers ?? ''}
               onChange={e => onChange({ ...req, params: { ...req.params, minFollowers: e.target.value ? Number(e.target.value) : undefined } })} />
           </Field>
+          <Field label="Organization name" optional>
+            <input className={inputCls} type="text" placeholder="e.g. fhenixprotocol"
+              value={req.params.orgName ?? ''}
+              onChange={e => onChange({ ...req, params: { ...req.params, orgName: e.target.value || undefined } })} />
+          </Field>
+          <Field label="Starred repo (owner/repo)" optional>
+            <input className={inputCls} type="text" placeholder="e.g. fhenixprotocol/fhenix"
+              value={req.params.starredRepo ?? ''}
+              onChange={e => onChange({ ...req, params: { ...req.params, starredRepo: e.target.value || undefined } })} />
+          </Field>
+          <Field label="Commits repo (owner/repo)" optional>
+            <input className={inputCls} type="text" placeholder="e.g. fhenixprotocol/fhenix"
+              value={req.params.commitsRepo ?? ''}
+              onChange={e => onChange({ ...req, params: { ...req.params, commitsRepo: e.target.value || undefined } })} />
+          </Field>
+          {req.params.commitsRepo && (
+            <Field label="Min commits" optional>
+              <input className={inputCls} type="number" min={1} placeholder="e.g. 3"
+                value={req.params.minCommits ?? ''}
+                onChange={e => onChange({ ...req, params: { ...req.params, minCommits: e.target.value ? Number(e.target.value) : undefined } })} />
+            </Field>
+          )}
         </div>
       )}
       {req.type === 'TELEGRAM_MEMBER' && (
