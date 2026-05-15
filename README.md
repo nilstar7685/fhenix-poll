@@ -2,7 +2,7 @@
 
 [Privacy-preserving ranked-choice voting powered by Fully Homomorphic Encryption (FHE) on Fhenix](https://fhenix-poll.vercel.app) / Arbitrum Sepolia. Vote totals accumulate homomorphically under encryption — the plaintext is only revealed after the poll closes via the Threshold Network.
 
-**Deployed contract (Arbitrum Sepolia):** `0x9dC0044FdB877F1F017D5853150b0B9725b26397`
+**Deployed contract (Arbitrum Sepolia):** `0xE663beAE94fc6eF11f8C37c866D439272dEE7e6c`
 
 ## How it works
 
@@ -14,18 +14,15 @@
 | 2 | **Voter** | Connects wallet / OAuth → Verifier checks requirements off-chain |
 | 3 | **Verifier** | Returns EIP-712 attestation to voter |
 | 4 | **Voter** | `issueCredential(attestation)` → credential + voting weight stored on-chain |
-| 5 | **Creator** | `createPoll()` or `createHierarchicalPoll()` → FHE tally slots + option tree on-chain |
-| 6 | **Voter** | `castVote(FHE-encrypted weights)` → tally updated homomorphically, plaintext never exposed |
+| 5 | **Creator** | `createPoll()`, `createSimplePoll()`, `createHierarchicalPoll()`, or `createSurvey()` → FHE tally slots on-chain |
+| 6 | **Voter** | `castVote(FHE-encrypted weights)` / `castSimpleVote()` / `castSurveyVote()` → tally updated homomorphically |
 | 7 | *(on-chain)* | Poll closes when `endBlock + 2` L1 blocks pass |
-| 8 | **Verifier** | `requestTallyReveal()` → `FHE.allowPublic` per option *(no `FHE.decrypt` — new SDK pattern)* |
+| 8 | **Verifier** | `requestTallyReveal()` or `requestSurveyReveal()` → `FHE.allowPublic` per option/answer |
 | 9 | **Verifier** | `decryptForTx(ctHash)` per option against the **Threshold Network** |
 | 10 | **Threshold Network** | Returns `plaintext + signature` |
-| 11 | **Verifier** | `publishTallyResult(plaintext, sig)` → sig verified on-chain, written to `revealedTallies` + `rolledUpTallies` |
-| 12 | **Voter** | Reads `revealedTallies` directly from contract → **trustless result verification** |
-| 13 | **Voter** | `createPost(contentHash)` → IPFS content hash stored on-chain *(Wave 4)* |
-| 14 | **Creator** | `createQuest(target)` → quest defined on-chain *(Wave 4)* |
-| 15 | **Verifier** | `recordQuestProgress(FHE-encrypted +1)` → progress accumulated under FHE *(Wave 4)* |
-| 16 | **Verifier** | `requestProgressReveal` + `decryptForTx` + `publishProgressResult` → quest completed if progress ≥ target *(Wave 4)* |
+| 11 | **Verifier** | `publishTallyResult(plaintext, sig)` or `publishSurveyResult()` → sig verified on-chain |
+| 12 | **Voter** | Reads `revealedTallies` / `surveyRevealedTallies` directly from contract → **trustless result verification** |
+| 13 | **Voter** | `createPost(contentHash)` → IPFS content hash stored on-chain |
 
 ## Features
 
@@ -44,8 +41,18 @@
 ### Voting
 - **Flat polls** — ranked-choice ballot, voters rank up to 32 options
 - **Hierarchical polls** — options have sub-options (up to 4 levels deep, 8 per parent); option tree stored on-chain with `parentId` and `childCount`; sub-category rollup tallies computed on-chain via `rolledUpTallies`
+- **Simple polls** — single-choice (pick exactly one option); radio button UI, `castSimpleVote()` encrypts `[0,...,votingPower,...,0]`
 - Each ranking maps to an encrypted weight submitted to `castVote()` — the contract adds it homomorphically to the running FHE tally
 - Double-vote prevention via on-chain mapping
+
+### Surveys
+- **Anonymous multi-question surveys** — each question has 2–10 answer options
+- Responses are FHE-encrypted as `euint32(0/1)` per answer slot — individual responses are never revealed
+- `createSurvey()` registers questions on-chain with `answerCounts[]` and `labelHashes[]`
+- `castSurveyVote()` accumulates encrypted answers into `_surveyTallies[pollId][questionId][answerId]`
+- `requestSurveyReveal()` + `publishSurveyResult()` — same Threshold Network pattern as polls
+- Results page shows per-question bar charts with counts and percentages
+- Dedicated Create Survey wizard and Survey voting UI (separate from polls)
 
 ### Tally & Results
 - After poll closes, `requestTallyReveal()` calls `FHE.allowPublic` per option (no `FHE.decrypt` — new pattern)
@@ -55,15 +62,10 @@
 - Automated tally runner checks every 60 seconds; manual trigger via `POST /admin/tally/:pollId`
 
 ### Community Posts
-- Credentialed members can post content (title + markdown body)
+- Credentialed members can post content (title + markdown body + optional image URL)
 - Content stored on IPFS; `keccak256(CID)` stored on-chain via `createPost()`
 - Gated communities require a valid credential to post
-
-### Community Quests
-- Community creators define quests with type (`VOTE_COUNT`, `REFERRAL_COUNT`, `CREDENTIAL_AGE`), target, and reward
-- Progress tracked as FHE-encrypted `euint32` — individual progress stays private
-- Quest runner auto-scans `VoteCast` events and records encrypted progress increments on-chain
-- Completion verified via `requestProgressReveal` + `publishProgressResult` with Threshold Network signature
+- Image support via URL link with live preview in creation modal
 
 ### Voting power decay
 ```
@@ -83,22 +85,22 @@ zkpoll/
 │                                  # publishProgressResult
 ├── frontend/
 │   └── src/
-│       ├── pages/           # PollFeed, CommunityFeed, CommunityDetail (Polls/Posts/Quests tabs),
-│       │                    # PollDetail, PollResults (hierarchical tree), CredentialsHub,
-│       │                    # MyVotes, CommunityPosts, CommunityQuests
-│       ├── components/      # CreateCommunityWizard, CreatePollWizard (flat + hierarchical),
-│       │                    # CredentialHub, VotingMode, CreatePostModal, QuestCard
-│       ├── hooks/           # useVoting, useCredentialHub, usePosts, useQuests,
-│       │                    # useCofheClient, useWriteContract
+│       ├── pages/           # PollFeed, Surveys, Activity, CommunityFeed, CommunityDetail
+│       │                    # (Polls/Surveys/Posts tabs), PollDetail, SurveyDetail,
+│       │                    # PollResults (hierarchical tree + survey per-question charts),
+│       │                    # CredentialsHub, MyVotes, CommunityPosts
+│       ├── components/      # CreateCommunityWizard, CreatePollWizard (flat + hierarchical + simple),
+│       │                    # CreateSurveyWizard, CredentialHub, VotingMode, CreatePostModal,
+│       │                    # VoteConfirmModal (adapts for simple/ranked)
+│       ├── hooks/           # useVoting (castVote + castSimple + castSurvey),
+│       │                    # useCredentialHub, usePosts, useCofheClient, useWriteContract
 │       └── lib/             # fhenix.ts, verifier.ts, cofhe.ts (sdk/web singleton), decay.ts
 ├── verifier/
 │   └── src/
-│       ├── index.ts         # REST API (communities, polls, posts, quests, OAuth, verify)
-│       ├── posts.ts         # File-backed post store
-│       ├── quests.ts        # File-backed quest + progress store
-│       ├── quest-runner.ts  # Background quest progress loop (120s interval)
-│       ├── tally.ts         # FHE tally decryption (CoFHE SDK + viem)
-│       ├── tally-runner.ts  # Background tally loop (60s interval)
+│       ├── index.ts         # REST API (communities, polls, posts, OAuth, verify)
+│       ├── posts.ts         # Pinata-backed post store
+│       ├── tally.ts         # FHE tally + survey decryption (CoFHE SDK + viem)
+│       ├── tally-runner.ts  # Background tally loop (60s interval, handles polls + surveys)
 │       ├── oauth.ts         # Twitter, Discord, GitHub, Telegram OAuth
 │       ├── issuer.ts        # EIP-712 credential attestation signing
 │       └── checkers/        # Per-requirement-type check implementations
@@ -157,22 +159,25 @@ npm install && npm run dev
 | Function | Caller | Description |
 |---|---|---|
 | `registerCommunity` | Community creator | Register community on-chain |
-| `createPoll` | Community creator | Create flat poll (2–32 options) |
+| `createPoll` | Community creator | Create flat ranked-choice poll (2–32 options) |
 | `createHierarchicalPoll` | Community creator | Create poll with on-chain option tree |
+| `createSimplePoll` | Community creator | Create single-choice poll |
+| `createSurvey` | Community creator | Create multi-question anonymous survey |
 | `issueCredential` | Voter | Submit EIP-712 attestation to get credential |
-| `castVote` | Voter | Submit FHE-encrypted per-option weights |
+| `castVote` | Voter | Submit FHE-encrypted per-option weights (ranked) |
+| `castSimpleVote` | Voter | Submit FHE-encrypted single choice |
+| `castSurveyVote` | Voter | Submit FHE-encrypted answers (flat 0/1 array) |
 | `requestTallyReveal` | Anyone (after poll ends) | `FHE.allowPublic` per option |
 | `publishTallyResult` | Tally runner | Verify Threshold Network sig + write plaintext |
+| `requestSurveyReveal` | Anyone (after survey ends) | `FHE.allowPublic` per question×answer |
+| `publishSurveyResult` | Tally runner | Verify sig + write survey answer count |
 | `createPost` | Credentialed member | Post content hash on-chain |
-| `createQuest` | Community creator | Define quest with target + reward |
-| `recordQuestProgress` | Verifier wallet | FHE-encrypt progress increment |
-| `requestProgressReveal` | Anyone | `FHE.allowPublic` on progress |
-| `publishProgressResult` | Anyone | Verify sig + mark complete if target reached |
 
 ## Security notes
 
 - Vote totals accumulate homomorphically under FHE — plaintext never exposed until poll ends
 - `msg.sender` (voter address) is public — privacy is about *what* you voted, not *that* you voted
 - `publishTallyResult` verifies the Threshold Network's signature — results cannot be forged
-- Quest progress is FHE-encrypted — individual progress stays private until reveal
+- Survey responses are FHE-encrypted — individual answers are never revealed, only aggregate counts
 - `FHE.allowPublic` (not `FHE.decrypt`) is the correct pattern per Fhenix SDK v0.5+
+- Creator-only guardrail: only community creator can create polls/surveys (enforced on-chain + UI warning)

@@ -1,6 +1,6 @@
 # ZKPoll — Testing Guide
 
-**Contract:** `FhenixPoll.sol` on Arbitrum Sepolia (`0x9dC0044FdB877F1F017D5853150b0B9725b26397`)  
+**Contract:** `FhenixPoll.sol` on Arbitrum Sepolia (`0xE663beAE94fc6eF11f8C37c866D439272dEE7e6c`)  
 **Chain ID:** 421614 (Arbitrum Sepolia)
 
 ---
@@ -28,7 +28,7 @@ npm install && npm run dev
 ```bash
 cd zkpoll/frontend
 cp .env.example .env
-# Set: VITE_CONTRACT_ADDRESS=0x9dC0044FdB877F1F017D5853150b0B9725b26397
+# Set: VITE_CONTRACT_ADDRESS=0xE663beAE94fc6eF11f8C37c866D439272dEE7e6c
 # Set: VITE_VERIFIER_URL=http://localhost:3001
 npm install && npm run dev
 # → http://localhost:5173
@@ -37,7 +37,7 @@ npm install && npm run dev
 ### 3. Unit tests
 ```bash
 cd zkpoll/contracts && npx hardhat test
-# 34 passing
+# 46 passing
 ```
 
 ---
@@ -64,7 +64,7 @@ cd zkpoll/contracts && npx hardhat test
 2. Add root options, click **+ Sub** to add children
 3. Deploy → verify tree on-chain:
 ```bash
-cast call 0x9dC0044FdB877F1F017D5853150b0B9725b26397 \
+cast call 0xE663beAE94fc6eF11f8C37c866D439272dEE7e6c \
   "getPollOption(bytes32,uint8)((uint8,uint8,uint8,bytes32,bool))" \
   <POLL_ID> 3 --rpc-url https://sepolia-rollup.arbitrum.io/rpc
 ```
@@ -101,34 +101,34 @@ curl -X POST http://localhost:3001/admin/tally/<POLL_ID> \
 
 Verify on-chain:
 ```bash
-cast call 0x9dC0044FdB877F1F017D5853150b0B9725b26397 \
+cast call 0xE663beAE94fc6eF11f8C37c866D439272dEE7e6c \
   "getRevealedTally(bytes32,uint8)(uint32)" <POLL_ID> 0 \
   --rpc-url https://sepolia-rollup.arbitrum.io/rpc
 
 # For hierarchical rollup:
-cast call 0x9dC0044FdB877F1F017D5853150b0B9725b26397 \
+cast call 0xE663beAE94fc6eF11f8C37c866D439272dEE7e6c \
   "rolledUpTallies(bytes32,uint8)(uint32)" <POLL_ID> 1 \
   --rpc-url https://sepolia-rollup.arbitrum.io/rpc
 ```
 
+### Simple Poll
+1. Community page → **+ Poll** → select **Simple Poll** type
+2. Add 2+ options → **Deploy Simple Poll** → approve tx
+3. Open poll → radio button UI → select one option → **Submit Vote**
+4. Confirm modal shows "Your Choice: [selected option]"
+5. My Votes shows green pill with selected option label
+
+### Survey
+1. Community page → **Surveys** tab → **+ Survey** (or `/create-survey`)
+2. Add questions with 2+ answers each → **Deploy Survey** → approve tx
+3. Open survey → answer each question (radio buttons per question) → **Submit Response**
+4. Wait for tally runner (60s) or manual reveal
+5. Results page shows per-question bar charts with counts and percentages
+
 ### Posts
-1. Community page → **Posts** tab → **View Posts** → **+ New Post**
-2. Fill title + body → **Publish** → approve tx
-3. Post appears with IPFS link
-
-### Quests (community creator only)
-1. Community page → **Quests** tab → **View Quests** → **+ New Quest**
-2. Type: `VOTE_COUNT`, Target: `2`, Expires: `30` days → **Create Quest**
-3. Vote in 2 polls → quest runner auto-records progress (120s interval)
-4. Quest card → **Check progress** → progress bar updates
-
-Manual progress update:
-```bash
-curl -X POST http://localhost:3001/quests/<QUEST_ID>/progress \
-  -H "x-admin-secret: <ADMIN_SECRET>" \
-  -H "Content-Type: application/json" \
-  -d '{"participant":"<ADDRESS>","progress":2,"completed":false}'
-```
+1. Community page → **Posts** tab → **+ Post** (or open posts page)
+2. Fill title, body, optional image URL (shows preview) → **Publish**
+3. Post appears in feed with image displayed
 
 ---
 
@@ -138,6 +138,9 @@ curl -X POST http://localhost:3001/quests/<QUEST_ID>/progress \
 |---|---|
 | Tally reverts with no reason | Poll has no votes — tally runner skips it automatically |
 | "FHE key error" on vote | Fhenix testnet node temporarily unavailable — retry in a few minutes |
+| "No votes were cast" on reveal | Zero-vote poll — results page shows "No votes were cast" message |
+| "Not a simple poll" / "Not a survey" | Wrong vote function called — UI handles this automatically |
+| "You are not the creator" warning | Only community creator can create polls/surveys (on-chain enforced) |
 | Results page stuck loading | Hard refresh; check browser console for errors |
 | Old polls not tallying | Old contract data — restart verifier; it will skip polls not found on current contract |
 | "Poll still open" revert | Tally runner waits `endBlock + 2` L1 blocks before attempting reveal |
@@ -146,5 +149,5 @@ curl -X POST http://localhost:3001/quests/<QUEST_ID>/progress \
 
 ## Arbiscan
 
-- Contract: https://sepolia.arbiscan.io/address/0x9dC0044FdB877F1F017D5853150b0B9725b26397
-- Events: https://sepolia.arbiscan.io/address/0x9dC0044FdB877F1F017D5853150b0B9725b26397#events
+- Contract: https://sepolia.arbiscan.io/address/0xE663beAE94fc6eF11f8C37c866D439272dEE7e6c
+- Events: https://sepolia.arbiscan.io/address/0xE663beAE94fc6eF11f8C37c866D439272dEE7e6c#events

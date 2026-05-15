@@ -1,6 +1,6 @@
 # ZKPoll Verifier API Reference
 
-The verifier is a Node.js/Express backend handling off-chain requirement verification, community/poll registry, OAuth flows, posts, quests, and the automated FHE tally engine.
+The verifier is a Node.js/Express backend handling off-chain requirement verification, community/poll registry, OAuth flows, posts, and the automated FHE tally engine (polls + surveys).
 
 **Base URL (local):** `http://localhost:3001`
 
@@ -14,7 +14,7 @@ The verifier is a Node.js/Express backend handling off-chain requirement verific
 4. [Communities](#4-communities)
 5. [Polls](#5-polls)
 6. [Posts (Wave 4)](#6-posts-wave-4)
-7. [Quests (Wave 4)](#7-quests-wave-4)
+7. [Survey Tally](#7-survey-tally)
 8. [Requirement Verification](#8-requirement-verification)
 9. [Tally](#9-tally)
 
@@ -140,48 +140,14 @@ Single post. `404` if not found.
 
 ---
 
-## 7. Quests (Wave 4)
+## 7. Survey Tally
 
-### `POST /pin/quest`
-Pin quest metadata to IPFS.
+The tally runner automatically handles surveys (`pollType == 3`):
+- Calls `requestSurveyReveal(pollId)` after survey closes
+- Iterates `surveyCtHashes[pollId][questionId][answerId]` for each question×answer
+- Calls `decryptForTx` + `publishSurveyResult` per answer
 
-**Body:**
-```json
-{
-  "quest_id": "0x...",
-  "community_id": "0x...",
-  "title": "Vote in 5 polls",
-  "description": "...",
-  "quest_type": "VOTE_COUNT | REFERRAL_COUNT | CREDENTIAL_AGE",
-  "target": 5,
-  "reward_description": "OG Badge",
-  "reward_hash": "0x...",
-  "expiry_block": 10900000
-}
-```
-Returns `{ "cid": "..." }`.
-
-### `POST /quests/confirm`
-Persist quest after `createQuest()` tx confirms.
-
-### `GET /communities/:id/quests`
-List all quests for a community. Returns `QuestInfo[]`.
-
-### `GET /quests/:questId`
-Single quest. `404` if not found.
-
-### `GET /quests/:questId/progress/:address`
-Get participant's off-chain progress.
-
-**Response:**
-```json
-{ "quest_id": "0x...", "participant": "0x...", "progress": 3, "completed": false }
-```
-
-### `POST /quests/:questId/progress`
-Update off-chain progress (admin only — requires `x-admin-secret` header).
-
-**Body:** `{ "participant": "0x...", "progress": 3, "completed": false }`
+Survey metadata (questions + answer labels) is stored in the same `/pin/poll` + `/polls/confirm` flow with `poll_type: "survey"` and a `questions` array in the body.
 
 ---
 
