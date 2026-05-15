@@ -9,7 +9,7 @@
 //   VERIFIER_PRIVATE_KEY    — wallet key with ETH for gas
 
 import { getAllCommunities } from "./communities.js"
-import { initTallyClients, getCurrentL1Block, getOnChainPoll, runTallyForPoll } from "./tally.js"
+import { initTallyClients, getCurrentL1Block, getOnChainPoll, runTallyForPoll, runSurveyTallyForPoll } from "./tally.js"
 
 const POLL_INTERVAL_MS = 60_000
 
@@ -55,7 +55,11 @@ async function runOnce(): Promise<void> {
 
       console.log(`[tally-runner] Processing ended poll ${pollId}…`)
       try {
-        await runTallyForPoll(pollId)
+        if (onChainPoll.pollType === 3) {
+          await runSurveyTallyForPoll(pollId)
+        } else {
+          await runTallyForPoll(pollId)
+        }
         done.add(pollId)
       } catch (e: unknown) {
         const msg = (e as Error).message ?? ''

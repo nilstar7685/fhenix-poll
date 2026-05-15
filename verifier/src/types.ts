@@ -61,7 +61,14 @@ export interface PollInfo {
   options: PollOptionInfo[]
   ipfs_cid?: string
   creator_address?: string
-  poll_type?: "flat" | "hierarchical"
+  poll_type?: "flat" | "hierarchical" | "simple" | "survey"
+  questions?: SurveyQuestionInfo[]
+}
+
+export interface SurveyQuestionInfo {
+  question_id: number
+  question_text: string
+  answers: string[]
 }
 
 export interface CommunityConfig {

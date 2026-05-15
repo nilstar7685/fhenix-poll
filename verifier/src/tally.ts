@@ -44,6 +44,7 @@ const TALLY_ABI = [
         { name: "optionCount",   type: "uint8"   },
         { name: "tallyRevealed", type: "bool"    },
         { name: "exists",        type: "bool"    },
+        { name: "pollType",      type: "uint8"   },
       ],
     }],
     stateMutability: "view",
@@ -81,6 +82,52 @@ const TALLY_ABI = [
       { name: "optionId", type: "uint8"   },
     ],
     outputs: [{ type: "uint32" }],
+    stateMutability: "view",
+  },
+  // Survey
+  {
+    type: "function", name: "requestSurveyReveal",
+    inputs: [{ name: "pollId", type: "bytes32" }],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function", name: "surveyCtHashes",
+    inputs: [
+      { name: "pollId",     type: "bytes32" },
+      { name: "questionId", type: "uint8"   },
+      { name: "answerId",   type: "uint8"   },
+    ],
+    outputs: [{ type: "bytes32" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function", name: "publishSurveyResult",
+    inputs: [
+      { name: "pollId",     type: "bytes32" },
+      { name: "questionId", type: "uint8"   },
+      { name: "answerId",   type: "uint8"   },
+      { name: "plaintext",  type: "uint32"  },
+      { name: "signature",  type: "bytes"   },
+    ],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function", name: "getSurveyQuestion",
+    inputs: [
+      { name: "pollId",     type: "bytes32" },
+      { name: "questionId", type: "uint8"   },
+    ],
+    outputs: [{
+      type: "tuple",
+      components: [
+        { name: "questionId",  type: "uint8"   },
+        { name: "answerCount", type: "uint8"   },
+        { name: "labelHash",   type: "bytes32" },
+        { name: "exists",      type: "bool"    },
+      ],
+    }],
     stateMutability: "view",
   },
 ] as const
@@ -161,7 +208,7 @@ export async function getOnChainPoll(pollId: `0x${string}`) {
   }) as Promise<{
     id: `0x${string}`; communityId: `0x${string}`; creator: `0x${string}`;
     credType: number; startBlock: number; endBlock: number;
-    optionCount: number; tallyRevealed: boolean; exists: boolean
+    optionCount: number; tallyRevealed: boolean; exists: boolean; pollType: number
   }>
 }
 
@@ -308,4 +355,74 @@ export async function runTallyForPoll(pollId: `0x${string}`): Promise<void> {
   }
 
   console.log(`[tally] Poll ${pollId} fully tallied.`)
+}
+
+/**
+ * Run the survey tally flow: requestSurveyReveal → decryptForTx per question×answer → publishSurveyResult
+ */
+export async function runSurveyTallyForPoll(pollId: `0x${string}`): Promise<void> {
+  if (!_clientReady || !_publicClient || !_walletClient || !_cofheClient) {
+    throw new Error("tally clients not ready")
+  }
+  const writeContract = _walletClient.writeContract as (...a: any[]) => Promise<`0x${string}`>
+  const readContract = _publicClient.readContract as (...a: any[]) => Promise<any>
+
+  const poll = await getOnChainPoll(pollId)
+  if (!poll.exists) throw new Error(`Poll ${pollId} does not exist`)
+
+  // Step 1 — request survey reveal
+  if (!poll.tallyRevealed) {
+    const l1Block = await getCurrentL1Block()
+    if (l1Block <= poll.endBlock + 2) {
+      throw new Error(`Poll still open — endBlock=${poll.endBlock}, current L1=${l1Block}`)
+    }
+    console.log(`[tally] Requesting survey reveal for ${pollId}…`)
+    await new Promise(r => setTimeout(r, 15_000))
+    const fees = await getGasFees()
+    const hash = await writeContract({
+      address: CONTRACT_ADDRESS, abi: TALLY_ABI,
+      functionName: "requestSurveyReveal", args: [pollId], ...fees,
+    })
+    await _publicClient.waitForTransactionReceipt({ hash })
+    console.log(`[tally] requestSurveyReveal confirmed: ${hash}`)
+  }
+
+  // Step 2 — publish each question×answer
+  for (let q = 1; q <= poll.optionCount; q++) {
+    const sq = await readContract({
+      address: CONTRACT_ADDRESS, abi: TALLY_ABI,
+      functionName: "getSurveyQuestion", args: [pollId, q],
+    }) as { questionId: number; answerCount: number; exists: boolean }
+
+    if (!sq.exists) continue
+
+    for (let a = 0; a < sq.answerCount; a++) {
+      const ctHashHex = await readContract({
+        address: CONTRACT_ADDRESS, abi: TALLY_ABI,
+        functionName: "surveyCtHashes", args: [pollId, q, a],
+      }) as `0x${string}`
+      const ctHash = BigInt(ctHashHex)
+
+      if (ctHash === 0n) {
+        console.log(`[tally]   Q${q} A${a}: no votes — skip`)
+        continue
+      }
+
+      console.log(`[tally]   Q${q} A${a}: decrypting…`)
+      const { decryptedValue, signature } = await _cofheClient
+        .decryptForTx(ctHash).withoutPermit().execute()
+
+      const fees = await getGasFees()
+      const hash = await writeContract({
+        address: CONTRACT_ADDRESS, abi: TALLY_ABI,
+        functionName: "publishSurveyResult",
+        args: [pollId, q, a, Number(decryptedValue), signature],
+        ...fees,
+      })
+      await _publicClient.waitForTransactionReceipt({ hash })
+      console.log(`[tally]   Q${q} A${a}: published ${decryptedValue}`)
+    }
+  }
+
+  console.log(`[tally] Survey ${pollId} fully tallied.`)
 }
