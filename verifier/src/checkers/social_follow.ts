@@ -15,7 +15,7 @@ export async function checkXFollow(
   targetHandle: string,
 ): Promise<boolean> {
   const apiKey  = process.env.TWITTERAPI_IO_KEY
-  const follower = followerUsername.replace("@", "").toLowerCase()
+  let follower = followerUsername.replace("@", "").toLowerCase()
   const target   = targetHandle.replace("@", "").toLowerCase()
 
   console.debug(`[checkXFollow] follower=${follower} target=${target} apiKey=${!!apiKey}`)
@@ -26,6 +26,23 @@ export async function checkXFollow(
 
   if (!apiKey) {
     throw new Error("TWITTERAPI_IO_KEY not set in verifier .env")
+  }
+
+  // If follower is a numeric ID, resolve to username first
+  if (/^\d+$/.test(follower)) {
+    try {
+      const userRes = await axios.get("https://api.twitterapi.io/twitter/user/info", {
+        headers: { "X-API-Key": apiKey },
+        params: { userId: follower },
+      })
+      const resolved = userRes.data?.data?.userName || userRes.data?.data?.screen_name
+      if (resolved) {
+        console.debug(`[checkXFollow] resolved ID ${follower} → @${resolved}`)
+        follower = resolved.toLowerCase()
+      }
+    } catch (err: any) {
+      console.warn("[checkXFollow] failed to resolve user ID to username:", err?.response?.data ?? err.message)
+    }
   }
 
   // Single call — check_follow_relationship returns { data: { following, followed_by } }
