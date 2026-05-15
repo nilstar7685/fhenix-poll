@@ -9,10 +9,8 @@ const AVATAR_COLORS = [
   'bg-blue-50 border-blue-100 text-blue-500',
   'bg-teal-50 border-teal-100 text-teal-600',
   'bg-emerald-50 border-emerald-100 text-emerald-600',
-  'bg-yellow-50 border-yellow-100 text-yellow-600',
   'bg-purple-50 border-purple-100 text-purple-600',
   'bg-orange-50 border-orange-100 text-orange-600',
-  'bg-red-50 border-red-100 text-red-500',
 ]
 
 interface FlatPoll { poll: PollInfo; community: CommunityConfig; colorIdx: number }
@@ -20,37 +18,28 @@ interface FlatPoll { poll: PollInfo; community: CommunityConfig; colorIdx: numbe
 const HOW_IT_WORKS = [
   {
     step: '01',
-    title: 'Get a credential',
-    body: "Meet your community's requirements. The verifier checks eligibility off-chain, then your EVM wallet receives an FHE credential on Fhenix.",
+    title: 'Create a community',
+    body: 'Define membership rules: token balance, NFT, X follow, Discord role, GitHub activity, or open to all. 11 requirement types with AND/OR logic.',
     colour: 'bg-blue-50 text-blue-600 border-blue-100',
   },
   {
     step: '02',
-    title: 'Rank your choices',
-    body: 'Cast ranked-choice ballots with up to 8 options. Your vote weights are FHE encrypted and tallied homomorphically without revealing individual ballots.',
+    title: 'Get a credential',
+    body: 'The verifier checks eligibility off-chain. Your wallet receives an EIP-712 signed credential on-chain with voting weight and expiry.',
     colour: 'bg-emerald-50 text-emerald-600 border-emerald-100',
   },
   {
     step: '03',
-    title: 'Your vote decays gracefully',
-    body: 'Voting power halves every 400 days across 5 periods. Recast with one click to restore 100% VP with the same rankings.',
+    title: 'Vote or respond',
+    body: 'Rank options, pick one, or answer survey questions. Everything is FHE encrypted in your browser before submission. The contract tallies homomorphically.',
     colour: 'bg-amber-50 text-amber-600 border-amber-100',
   },
   {
     step: '04',
-    title: 'Results are verifiable',
-    body: 'The FHE tally is decrypted on-chain by the Fhenix network. Anyone can audit the result without learning individual votes.',
+    title: 'Results verified on-chain',
+    body: 'After close, the Fhenix Threshold Network decrypts only the aggregate. The signed result is published on-chain. Anyone can verify no trust required.',
     colour: 'bg-purple-50 text-purple-600 border-purple-100',
   },
-]
-
-const DECAY_TABLE = [
-  { period: 0, days: '0 – 399',     vp: '100%', colour: 'text-emerald-600' },
-  { period: 1, days: '400 – 799',   vp: '50%',  colour: 'text-yellow-500' },
-  { period: 2, days: '800 – 1,199', vp: '25%',  colour: 'text-orange-500' },
-  { period: 3, days: '1,200–1,599', vp: '12.5%',colour: 'text-orange-500' },
-  { period: 4, days: '1,600–1,999', vp: '6.25%',colour: 'text-orange-500' },
-  { period: 5, days: '2,000+',      vp: '0%',   colour: 'text-red-500' },
 ]
 
 export default function LandingPage() {
@@ -67,11 +56,11 @@ export default function LandingPage() {
       .then(communities => {
         const flat: FlatPoll[] = []
         communities.forEach((c, ci) => {
-          ;(c.polls ?? []).forEach(p => {
+          ; (c.polls ?? []).forEach(p => {
             flat.push({ poll: p, community: c, colorIdx: ci % AVATAR_COLORS.length })
           })
         })
-        setPolls(flat)
+        setPolls(flat.sort((a, b) => b.poll.created_at_block - a.poll.created_at_block).slice(0, 6))
       })
       .catch(() => null)
   }, [])
@@ -92,51 +81,75 @@ export default function LandingPage() {
 
           <div className="inline-flex items-center gap-2 bg-gray-900 text-white px-4 py-1.5 rounded-full text-xs font-medium mb-10">
             <span className="w-1.5 h-1.5 rounded-full bg-[#10B981] shadow-[0_0_6px_1px_rgba(16,185,129,0.6)]" />
-            Built on Fhenix · FHE-proven ballots
+            Fhenix CoFHE · Arbitrum Sepolia · Live
           </div>
 
           <h1 className="text-5xl sm:text-6xl md:text-7xl font-semibold tracking-tight leading-[1.06]">
-            <span className="text-[#0070F3]">Private governance</span>
+            <span className="text-[#0070F3]">Private polls</span>
             <br />
-            <span className="text-gray-900">for your community.</span>
+            <span className="text-gray-900">& anonymous surveys.</span>
           </h1>
 
           <p className="mt-7 text-lg text-gray-500 max-w-xl leading-relaxed">
-            Credentials prove eligibility. Vote weights are FHE-encrypted.
-            Tallies computed homomorphically no vote ever revealed.
+            FHE-encrypted voting for communities. Ranked-choice, simple polls, and multi-question surveys individual responses are never revealed. Only aggregates.
           </p>
 
-          <div className="mt-10 flex flex-col sm:flex-row items-center gap-4">
+          <div className="mt-10 flex flex-col sm:flex-row items-center gap-3">
             <WalletButton />
-            <Link
-              to="/polls"
-              className="text-sm font-medium text-gray-500 hover:text-gray-900 transition-colors"
-            >
-              Browse polls without connecting →
+            <Link to="/polls"
+              className="text-sm font-medium text-gray-500 hover:text-gray-900 transition-colors">
+              Browse without connecting →
             </Link>
           </div>
+        </section>
 
-          {/* Three pillars */}
-          <div className="mt-16 grid grid-cols-1 sm:grid-cols-3 gap-4 w-full text-left">
+        {/* ── Three product modes ─────────────────────────────────────────── */}
+        <section className="max-w-4xl mx-auto px-4 mt-20 w-full">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {[
-              { icon: '🔒', title: 'Votes are FHE-encrypted', body: 'Your ballot weights are encrypted client-side before submission. The chain tallies homomorphically and nobody sees individual votes.' },
-              { icon: '⚖️', title: 'EV × VP% = CV', body: 'Eligible Votes reflect your stake. Voting Power decays over time. Counted Votes is the product recast anytime to restore.' },
-              { icon: '🌐', title: 'Verifiable results', body: 'The Fhenix network decrypts the aggregate tally on-chain. Audit the outcome without revealing individual votes.' },
-            ].map(({ icon, title, body }) => (
-              <div key={title} className="bg-gray-50 border border-gray-100 rounded-2xl p-5">
-                <div className="text-2xl mb-3">{icon}</div>
-                <p className="text-sm font-semibold text-gray-900 mb-1.5">{title}</p>
-                <p className="text-xs text-gray-500 leading-relaxed">{body}</p>
+              {
+                title: 'Polls',
+                desc: 'Ranked-choice or single-pick. FHE-encrypted ballots accumulate homomorphically. Only the aggregate tally is decrypted.',
+                cta: '/create-poll',
+                ctaLabel: 'Create Poll',
+                border: 'border-blue-100 hover:border-blue-200',
+                badge: 'bg-blue-50 text-blue-600',
+              },
+              {
+                title: 'Surveys',
+                desc: 'Multi-question anonymous forms. Each answer encrypted as 0/1. Individual responses are mathematically impossible to extract.',
+                cta: '/create-survey',
+                ctaLabel: 'Create Survey',
+                border: 'border-purple-100 hover:border-purple-200',
+                badge: 'bg-purple-50 text-purple-600',
+              },
+              {
+                title: 'Communities',
+                desc: 'Gate participation with 11 requirement types: token balance, NFT, X follow, Discord, GitHub, and more. AND/OR logic.',
+                cta: '/create',
+                ctaLabel: 'New Community',
+                border: 'border-emerald-100 hover:border-emerald-200',
+                badge: 'bg-emerald-50 text-emerald-600',
+              },
+            ].map(({ title, desc, cta, ctaLabel, border, badge }) => (
+              <div key={title} className={`bg-white border rounded-2xl p-5 flex flex-col justify-between min-h-[200px] transition-all ${border}`}>
+                <div>
+                  <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${badge}`}>{title}</span>
+                  <p className="text-sm text-gray-600 mt-3 leading-relaxed">{desc}</p>
+                </div>
+                <Link to={cta} className="mt-4 text-xs font-medium text-[#0070F3] hover:underline">
+                  {ctaLabel} →
+                </Link>
               </div>
             ))}
           </div>
         </section>
 
-        {/* ── Active Polls ────────────────────────────────────────────────── */}
+        {/* ── Recent activity ─────────────────────────────────────────────── */}
         <section className="max-w-4xl mx-auto px-4 mt-24 w-full">
           <div className="flex items-center gap-2.5 mb-6">
             <div className="w-2 h-2 rounded-full bg-[#0070F3]" />
-            <h2 className="text-sm font-semibold text-gray-900 tracking-tight">Active Polls</h2>
+            <h2 className="text-sm font-semibold text-gray-900 tracking-tight">Recent Polls & Surveys</h2>
             {polls.length > 0 && <span className="text-sm text-gray-400">{polls.length}</span>}
           </div>
 
@@ -154,8 +167,14 @@ export default function LandingPage() {
                   <div className="flex justify-between items-start gap-3">
                     <p className="text-sm font-medium text-gray-900 leading-snug line-clamp-2">{poll.title}</p>
                     <div className="flex items-center gap-1 shrink-0 mt-0.5">
-                      <div className="w-1.5 h-1.5 rounded-full bg-[#10B981]" />
-                      <span className="text-[10px] text-gray-400">live</span>
+                      {poll.poll_type === 'survey' ? (
+                        <span className="text-[10px] bg-purple-50 text-purple-500 border border-purple-100 px-1.5 py-0.5 rounded-full">survey</span>
+                      ) : (
+                        <>
+                          <div className="w-1.5 h-1.5 rounded-full bg-[#10B981]" />
+                          <span className="text-[10px] text-gray-400">{poll.poll_type === 'simple' ? 'simple' : 'ranked'}</span>
+                        </>
+                      )}
                     </div>
                   </div>
                   <div className="mt-4 flex items-center gap-2.5">
@@ -170,7 +189,9 @@ export default function LandingPage() {
                     <div>
                       <p className="text-xs font-medium text-gray-800 leading-none">{community.name}</p>
                       <p className="text-[10px] text-gray-400 mt-0.5">
-                        {poll.options.length} option{poll.options.length !== 1 ? 's' : ''}
+                        {poll.poll_type === 'survey'
+                          ? `${poll.questions?.length ?? 0} question${(poll.questions?.length ?? 0) !== 1 ? 's' : ''}`
+                          : `${poll.options.length} option${poll.options.length !== 1 ? 's' : ''}`}
                       </p>
                     </div>
                   </div>
@@ -201,33 +222,18 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* ── Decay model table ───────────────────────────────────────────── */}
-        <section className="max-w-4xl mx-auto px-4 mt-24 w-full">
-          <div className="flex items-center gap-2.5 mb-6">
-            <div className="w-2 h-2 rounded-full bg-amber-400" />
-            <h2 className="text-sm font-semibold text-gray-900 tracking-tight">Vote power decay schedule</h2>
-          </div>
-          <div className="border border-gray-100 rounded-2xl overflow-hidden">
-            <div className="grid grid-cols-3 bg-gray-50 border-b border-gray-100 px-5 py-2.5 text-[11px] font-semibold text-gray-400 uppercase tracking-wide">
-              <span>Period</span>
-              <span>Days since credential</span>
-              <span>Voting Power</span>
-            </div>
-            {DECAY_TABLE.map(({ period, days, vp, colour }) => (
-              <div
-                key={period}
-                className="grid grid-cols-3 px-5 py-3 border-b border-gray-50 last:border-0 hover:bg-gray-50/50 transition-colors"
-              >
-                <span className="text-xs text-gray-500 font-medium">{period === 5 ? '5+ (dead)' : period}</span>
-                <span className="text-xs text-gray-400">{days}</span>
-                <span className={`text-sm font-semibold tabular-nums ${colour}`}>{vp}</span>
-              </div>
-            ))}
-            <div className="px-5 py-3 bg-gray-50 border-t border-gray-100">
-              <p className="text-[11px] text-gray-400">
-                Recast your vote at any time to reset to 100% with identical rankings.
-              </p>
-            </div>
+        {/* ── Trust strip ─────────────────────────────────────────────────── */}
+        <section className="max-w-4xl mx-auto px-4 mt-16 w-full">
+          <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs text-gray-400 font-medium">
+            <span>Fhenix CoFHE</span>
+            <span className="w-1 h-1 rounded-full bg-gray-200" />
+            <span>Arbitrum Sepolia</span>
+            <span className="w-1 h-1 rounded-full bg-gray-200" />
+            <span>Threshold Network decryption</span>
+            <span className="w-1 h-1 rounded-full bg-gray-200" />
+            <span>No trusted server</span>
+            <span className="w-1 h-1 rounded-full bg-gray-200" />
+            <span>IPFS persistence</span>
           </div>
         </section>
 
@@ -238,15 +244,20 @@ export default function LandingPage() {
             <div className="absolute -bottom-10 -left-10 w-64 h-64 bg-emerald-600/10 rounded-full blur-3xl pointer-events-none" />
             <div className="relative z-10 flex flex-col items-center">
               <h2 className="text-3xl sm:text-4xl font-semibold text-white tracking-tight leading-tight mb-4">
-                Nobody not even us<br/>
+                Nobody not even us<br />
                 <span className="text-[#0070F3]">can see how you voted.</span>
               </h2>
               <p className="text-gray-400 text-sm max-w-md leading-relaxed mb-10">
-                FHE-proven private governance on Fhenix. Your credential proves membership.
-                Your ballot is encrypted. Only the aggregate tally is ever revealed.
+                Polls, surveys, and community governance all FHE-encrypted on Fhenix.
+                Your credential proves membership. Your ballot is private. Results are verified on-chain.
               </p>
-              <WalletButton />
-              <p className="mt-4 text-xs text-gray-500">Fully Homomorphic Encryption on Arbitrum Sepolia.</p>
+              <div className="flex flex-col sm:flex-row items-center gap-3">
+                <WalletButton />
+                <Link to="/create-survey"
+                  className="text-sm font-medium text-gray-400 hover:text-white transition-colors">
+                  or create a survey →
+                </Link>
+              </div>
             </div>
           </div>
         </section>
