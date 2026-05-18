@@ -222,18 +222,30 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* ── Trust strip ─────────────────────────────────────────────────── */}
-        <section className="max-w-4xl mx-auto px-4 mt-16 w-full">
-          <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs text-gray-400 font-medium">
+        {/* ── Built with ────────────────────────────────────────────────── */}
+        <section className="max-w-4xl mx-auto px-4 mt-24 w-full">
+          <p className="text-center text-xs font-medium text-gray-400 uppercase tracking-wide mb-8">Built with</p>
+          <div className="flex items-center justify-center gap-12 flex-wrap">
+            {[
+              { src: '/fhenix-logo.svg', alt: 'Fhenix', width: 'w-28' },
+              { src: '/arbitrum-logo.svg', alt: 'Arbitrum', width: 'w-32' },
+            ].map(({ src, alt, width }) => (
+              <img
+                key={alt}
+                src={src}
+                alt={alt}
+                className={`${width} h-auto grayscale opacity-50 hover:grayscale-0 hover:opacity-100 transition-all duration-300 cursor-pointer`}
+              />
+            ))}
+          </div>
+          <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs text-gray-400 font-medium mt-8">
             <span>Fhenix CoFHE</span>
             <span className="w-1 h-1 rounded-full bg-gray-200" />
             <span>Arbitrum Sepolia</span>
             <span className="w-1 h-1 rounded-full bg-gray-200" />
-            <span>Threshold Network decryption</span>
+            <span>Threshold Network</span>
             <span className="w-1 h-1 rounded-full bg-gray-200" />
-            <span>No trusted server</span>
-            <span className="w-1 h-1 rounded-full bg-gray-200" />
-            <span>IPFS persistence</span>
+            <span>IPFS via Pinata</span>
           </div>
         </section>
 
