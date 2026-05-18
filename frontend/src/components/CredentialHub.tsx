@@ -40,6 +40,8 @@ function reqDetail(req: Requirement): string | null {
     case 'DISCORD_MEMBER':  return p.serverId ? `Server ID: ${p.serverId}` : null
     case 'DISCORD_ROLE':    return p.roleId ? `Role ID: ${p.roleId}` : null
     case 'GITHUB_ACCOUNT':
+      if (p.starredRepo)  return `Starred ${p.starredRepo}`
+      if (p.commitsRepo)  return `${p.minCommits ?? 1}+ commits in ${p.commitsRepo}`
       if (p.orgName)      return `Member of ${p.orgName}`
       if (p.minRepos)     return `${p.minRepos}+ public repos`
       if (p.minFollowers) return `${p.minFollowers}+ followers`
