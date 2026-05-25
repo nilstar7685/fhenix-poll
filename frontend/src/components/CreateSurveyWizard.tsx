@@ -166,16 +166,16 @@ export default function CreateSurveyWizard() {
 
   return (
     <div className="max-w-lg mx-auto w-full">
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 flex flex-col" style={{ minHeight: 640 }}>
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 flex flex-col" >
 
-        <div className="shrink-0 px-8 pt-8 pb-2">
+        <div className="shrink-0 px-4 sm:px-8 pt-8 pb-2">
           <WizardStepper step={step} />
           <h2 className="text-2xl font-semibold tracking-tight text-gray-900 text-center mb-4">
             {STEP_LABELS[step - 1]}
           </h2>
         </div>
 
-        <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar px-8 py-4">
+        <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar px-4 sm:px-8 py-4">
 
           {/* Step 1 — Setup */}
           {step === 1 && (
@@ -325,7 +325,7 @@ export default function CreateSurveyWizard() {
 
         {/* Footer navigation */}
         {deployStatus !== 'done' && (
-          <div className="shrink-0 px-8 pb-8 pt-4 border-t border-gray-100">
+          <div className="shrink-0 px-4 sm:px-8 pb-8 pt-4 border-t border-gray-100">
             <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden mb-4">
               <div className="h-full bg-[#0070F3] rounded-full transition-all" style={{ width: `${(step / STEP_LABELS.length) * 100}%` }} />
             </div>

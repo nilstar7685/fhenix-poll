@@ -33,11 +33,11 @@ export default function VoteConfirmModal({ ranking, options, onConfirm, onCancel
   return (
     // Full-screen overlay — blur the background
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center px-4 pt-8"
+      className="fixed inset-0 z-50 flex items-start justify-center px-4 pt-8 overflow-y-auto"
       style={{ background: 'rgba(0,0,0,0.3)', backdropFilter: 'blur(2px)' }}
       onClick={onCancel}
     >
-      <div className="w-full max-w-md" onClick={e => e.stopPropagation()}>
+      <div className="w-full max-w-md pb-8" onClick={e => e.stopPropagation()}>
 
         {/* Dark modal box — matches ref2 */}
         <div className="bg-[#0a0a0a] rounded-2xl shadow-2xl overflow-hidden flex flex-col border border-gray-800/60">

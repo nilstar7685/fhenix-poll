@@ -328,16 +328,16 @@ export default function CreatePollWizard() {
 
   return (
     <div className="max-w-lg mx-auto w-full">
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 flex flex-col" style={{ minHeight: 640 }}>
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 flex flex-col" >
 
-        <div className="shrink-0 px-8 pt-8 pb-2">
+        <div className="shrink-0 px-4 sm:px-8 pt-8 pb-2">
           <WizardStepper step={step} />
           <h2 className="text-2xl font-semibold tracking-tight text-gray-900 text-center mb-4">
             {STEP_LABELS[step - 1]}
           </h2>
         </div>
 
-        <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar px-8 py-4">
+        <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar px-4 sm:px-8 py-4">
 
           {/* Step 1 */}
           {step === 1 && (
@@ -420,7 +420,7 @@ export default function CreatePollWizard() {
               {/* Poll type — card selector */}
               <div>
                 <label className={labelCls}>Poll Type</label>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   {([
                     { value: 'flat' as const,          label: 'Ranked',       desc: 'Rank multiple options.',         icon: '▤' },
                     { value: 'hierarchical' as const,  label: 'Hierarchical', desc: 'Root + sub-options.',            icon: '▦', badge: 'Beta' },
@@ -608,7 +608,7 @@ export default function CreatePollWizard() {
         </div>
 
         {deployStatus !== 'done' && (
-          <div className="shrink-0 bg-white px-8 pt-5 pb-7 border-t border-gray-100 shadow-[0_-8px_24px_-8px_rgba(0,0,0,0.06)] flex flex-col items-center">
+          <div className="shrink-0 bg-white px-4 sm:px-8 pt-5 pb-7 border-t border-gray-100 shadow-[0_-8px_24px_-8px_rgba(0,0,0,0.06)] flex flex-col items-center">
             <div className="w-full max-w-[300px] flex flex-col gap-4">
               <span className="text-center text-sm font-medium text-gray-900 tracking-tight">
                 {STEP_LABELS[step - 1]}

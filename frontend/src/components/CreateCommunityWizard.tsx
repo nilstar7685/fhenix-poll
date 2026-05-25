@@ -104,7 +104,7 @@ function DetailsStep({ value, onChange }: { value: DetailsForm; onChange: (v: De
         <input className={inputCls} placeholder="https://…" value={value.logo}
           onChange={e => set('logo', e.target.value)} />
       </div>
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <label className={labelCls}>Credential Type</label>
           <div className="space-y-2">
@@ -515,15 +515,15 @@ export default function CreateCommunityWizard() {
 
   return (
     <div className="max-w-lg mx-auto w-full">
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 flex flex-col" style={{ minHeight: 640 }}>
-        <div className="shrink-0 px-8 pt-8 pb-2">
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 flex flex-col" >
+        <div className="shrink-0 px-4 sm:px-8 pt-8 pb-2">
           <WizardStepper step={step} />
           <h2 className="text-2xl font-semibold tracking-tight text-gray-900 text-center mb-4">
             {STEPS[step]}
           </h2>
         </div>
 
-        <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar px-8 py-4">
+        <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar px-4 sm:px-8 py-4">
           {step === 0 && <DetailsStep value={details} onChange={d => {
             if (d.credential_type === 1 && details.credential_type !== 1) {
               setGroups([{ id: crypto.randomUUID(), logic: 'AND', requirements: [{ id: crypto.randomUUID(), type: 'FREE', params: {} }] }])
@@ -543,7 +543,7 @@ export default function CreateCommunityWizard() {
           )}
         </div>
 
-        <div className="shrink-0 bg-white px-8 pt-5 pb-7 border-t border-gray-100 shadow-[0_-8px_24px_-8px_rgba(0,0,0,0.06)] flex flex-col items-center">
+        <div className="shrink-0 bg-white px-4 sm:px-8 pt-5 pb-7 border-t border-gray-100 shadow-[0_-8px_24px_-8px_rgba(0,0,0,0.06)] flex flex-col items-center">
           <div className="w-full max-w-[300px] flex flex-col gap-4">
             <span className="text-center text-sm font-medium text-gray-900 tracking-tight">{STEPS[step]}</span>
             <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">

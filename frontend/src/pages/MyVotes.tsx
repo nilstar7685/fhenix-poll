@@ -139,7 +139,7 @@ function VoteCard({ vote }: { vote: EnrichedVote }) {
         return (
           <div className="px-5 pb-3">
             <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1.5">My Submission</p>
-            <div className="space-y-1.5">
+            <div className="flex flex-wrap gap-1.5">
               {roots.map(o => (
                 <div key={o.id}>
                   <span className="text-[11px] bg-blue-50 text-blue-700 border border-blue-100 px-2 py-0.5 rounded-full font-medium inline-block">

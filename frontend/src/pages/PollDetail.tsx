@@ -302,8 +302,8 @@ export default function PollDetail() {
       {isDone ? (
         // ── Already voted / Success ───────────────────────────────────────
         <div className="bg-white rounded-4xl border border-gray-100 shadow-xl overflow-hidden">
-          <div className="px-8 pt-10 pb-6"><Stepper step={4} /></div>
-          <div className="px-8 pb-10 flex flex-col items-center text-center gap-4">
+          <div className="px-4 sm:px-8 pt-10 pb-6"><Stepper step={4} /></div>
+          <div className="px-4 sm:px-8 pb-10 flex flex-col items-center text-center gap-4">
             {alreadyVoted && status !== 'done' ? (
               // Already voted in a previous session — warn clearly
               <>
@@ -347,10 +347,10 @@ export default function PollDetail() {
         </div>
       ) : (
         // ── Main vote card ───────────────────────────────────────────────
-        <div className="bg-white rounded-4xl border border-gray-100 shadow-xl flex flex-col" style={{ minHeight: 700 }}>
+        <div className="bg-white rounded-4xl border border-gray-100 shadow-xl flex flex-col" >
 
           {/* Stepper */}
-          <div className="shrink-0 px-8 pt-10 pb-0">
+          <div className="shrink-0 px-4 sm:px-8 pt-10 pb-0">
             <Stepper step={step} />
           </div>
 

@@ -40,7 +40,7 @@ export default function PollFeed() {
 
       {/* Hero */}
       <section className="text-center pt-8 pb-2">
-        <h1 className="text-5xl sm:text-6xl font-semibold tracking-tight leading-tight">
+        <h1 className="text-3xl sm:text-5xl md:text-6xl font-semibold tracking-tight leading-tight">
           <span className="text-[#0070F3] block pb-1">Privacy-first</span>
           <span className="text-gray-900 block">polls & surveys</span>
         </h1>

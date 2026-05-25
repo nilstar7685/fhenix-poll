@@ -84,7 +84,7 @@ export default function LandingPage() {
             Fhenix CoFHE · Arbitrum Sepolia · Live
           </div>
 
-          <h1 className="text-5xl sm:text-6xl md:text-7xl font-semibold tracking-tight leading-[1.06]">
+          <h1 className="text-3xl sm:text-5xl md:text-6xl lg:text-7xl font-semibold tracking-tight leading-[1.06]">
             <span className="text-[#0070F3]">Private polls</span>
             <br />
             <span className="text-gray-900">& anonymous surveys.</span>
@@ -250,12 +250,12 @@ export default function LandingPage() {
         </section>
 
         {/* ── Bottom CTA ──────────────────────────────────────────────────── */}
-        <section className="max-w-4xl mx-auto px-4 mt-24 mb-32 w-full">
-          <div className="bg-gray-900 rounded-3xl p-10 sm:p-14 flex flex-col items-center text-center relative overflow-hidden">
+        <section className="max-w-4xl mx-auto px-4 mt-16 sm:mt-24 mb-16 sm:mb-32 w-full">
+          <div className="bg-gray-900 rounded-3xl p-6 sm:p-10 md:p-14 flex flex-col items-center text-center relative overflow-hidden">
             <div className="absolute -top-10 -right-10 w-48 h-48 bg-blue-600/10 rounded-full blur-3xl pointer-events-none" />
             <div className="absolute -bottom-10 -left-10 w-64 h-64 bg-emerald-600/10 rounded-full blur-3xl pointer-events-none" />
             <div className="relative z-10 flex flex-col items-center">
-              <h2 className="text-3xl sm:text-4xl font-semibold text-white tracking-tight leading-tight mb-4">
+              <h2 className="text-2xl sm:text-3xl md:text-4xl font-semibold text-white tracking-tight leading-tight mb-4">
                 Nobody not even us<br />
                 <span className="text-[#0070F3]">can see how you voted.</span>
               </h2>
