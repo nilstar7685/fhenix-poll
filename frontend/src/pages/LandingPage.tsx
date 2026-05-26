@@ -96,7 +96,7 @@ export default function LandingPage() {
 
           <div className="mt-10 flex flex-col sm:flex-row items-center gap-3">
             <WalletButton />
-            <a href={import.meta.env.VITE_FORMS_URL ?? '/forms'}
+            <a href={import.meta.env.VITE_FORMS_URL ?? 'https://fhenix-forms.vercel.app'}
               className="bg-[#0070F3] hover:bg-blue-600 text-white px-6 py-3 rounded-full text-sm font-medium transition-colors shadow-sm">
               FhenixForms ↗
             </a>
