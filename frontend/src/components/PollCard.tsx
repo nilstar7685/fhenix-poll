@@ -68,11 +68,11 @@ export default function PollCard({ communityId, communityName, poll }: Props) {
       </div>
 
       <div className="mt-4 flex justify-between items-end">
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex flex-wrap gap-1.5 min-w-0 flex-1">
           {rootOptions.slice(0, 3).map(opt => (
             <span
               key={opt.option_id}
-              className="text-xs font-medium bg-gray-50 text-gray-600 border border-gray-100 px-2.5 py-1 rounded-full"
+              className="text-xs font-medium bg-gray-50 text-gray-600 border border-gray-100 px-2.5 py-1 rounded-lg truncate max-w-[140px]"
             >
               {opt.label}
             </span>
