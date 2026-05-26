@@ -37,7 +37,14 @@ npm install && npm run dev
 ### 3. Unit tests
 ```bash
 cd zkpoll/contracts && npx hardhat test
-# 46 passing
+# 46 passing (FhenixPoll) + 8 passing (FhenixForms) = 54 total
+```
+
+### 4. FhenixForms (standalone app)
+```bash
+cd zkpoll/fhenix-forms
+npm install && npm run dev
+# → http://localhost:5173
 ```
 
 ---
@@ -151,3 +158,47 @@ cast call 0xE663beAE94fc6eF11f8C37c866D439272dEE7e6c \
 
 - Contract: https://sepolia.arbiscan.io/address/0xE663beAE94fc6eF11f8C37c866D439272dEE7e6c
 - Events: https://sepolia.arbiscan.io/address/0xE663beAE94fc6eF11f8C37c866D439272dEE7e6c#events
+
+---
+
+## FhenixForms Testing
+
+**Contract:** `0x1796944Ac448714897B113B5FB2cD6D79b6a5B9d`
+
+### Create Form
+1. Open FhenixForms app → **Create** (navbar)
+2. Add title, set duration (days), add questions
+3. Drag ⠿ handle to reorder questions
+4. Question types: Single Choice, Multi Choice, Scale (1–10), Yes/No, Rating (1–5)
+5. **Create & Share Form** → approve tx → copy shareable link
+
+### Respond
+1. Open `/f/:formId` link
+2. Answer each question one-per-screen (Typeform style)
+3. **Submit** → FHE encryption in browser → approve tx
+4. "Response Submitted" confirmation
+
+### Results
+1. Navigate to `/f/:formId/results`
+2. After form closes + auto-reveal: bar charts per question
+3. Verify on-chain:
+```bash
+cast call 0x1796944Ac448714897B113B5FB2cD6D79b6a5B9d \
+  "getRevealedTally(bytes32,uint32,uint32)(uint32)" <FORM_ID> 1 0 \
+  --rpc-url https://sepolia-rollup.arbitrum.io/rpc
+```
+
+### Unit Tests
+```bash
+cd zkpoll/contracts && npx hardhat test test/FhenixForms.test.ts
+# 8 passing — covers createForm, submitResponse, requestFormReveal, publishFormResult
+```
+
+### Common Issues
+
+| Symptom | Fix |
+|---|---|
+| "Form not found" | Check formId matches deployed form |
+| Encryption fails | Fhenix testnet node temporarily unavailable — retry |
+| Results stuck on "Pending" | Forms runner needs to be running in verifier |
+| "Already responded" | Each address can only respond once per form |

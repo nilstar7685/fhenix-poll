@@ -241,10 +241,11 @@ Starts on boot. Every 60 seconds:
 - Skips polls with `l1Block <= endBlock + 2` (buffer to avoid boundary race)
 - Runs `runTallyForPoll` for ended, unrevealed polls with votes
 
-### Automated Quest Runner
-Starts on boot. Every 120 seconds:
-- For `VOTE_COUNT` quests: scans `VoteCast` events, encrypts progress increments, calls `recordQuestProgress` on-chain
-- After recording, calls `requestProgressReveal` + `publishProgressResult` for participants near completion
+### Automated Forms Runner
+Starts on boot alongside tally runner. Every 60 seconds:
+- Scans `FormCreated` events from `FHENIX_FORMS_ADDRESS`
+- For closed, unrevealed forms with responses: calls `requestFormReveal` + `publishFormResult`
+- Same Threshold Network decryption pattern as polls
 
 ---
 

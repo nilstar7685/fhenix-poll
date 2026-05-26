@@ -78,11 +78,13 @@ Period 1: 100% → Period 2: 50% → Period 3: 25% → Period 4: 12.5% → Perio
 ```
 zkpoll/
 ├── contracts/
-│   └── contracts/FhenixPoll.sol   # registerCommunity, createPoll, createHierarchicalPoll,
-│                                  # issueCredential, castVote, requestTallyReveal,
-│                                  # publishTallyResult, createPost, createQuest,
-│                                  # recordQuestProgress, requestProgressReveal,
-│                                  # publishProgressResult
+│   ├── contracts/FhenixPoll.sol   # registerCommunity, createPoll, createHierarchicalPoll,
+│   │                              # issueCredential, castVote, requestTallyReveal,
+│   │                              # publishTallyResult, createPost, createSimplePoll,
+│   │                              # castSimpleVote, createSurvey, castSurveyVote,
+│   │                              # requestSurveyReveal, publishSurveyResult
+│   └── contracts/FhenixForms.sol  # createForm, submitResponse, requestFormReveal,
+│                                  # publishFormResult (standalone encrypted forms)
 ├── frontend/
 │   └── src/
 │       ├── pages/           # PollFeed, Surveys, Activity, CommunityFeed, CommunityDetail
@@ -95,17 +97,42 @@ zkpoll/
 │       ├── hooks/           # useVoting (castVote + castSimple + castSurvey),
 │       │                    # useCredentialHub, usePosts, useCofheClient, useWriteContract
 │       └── lib/             # fhenix.ts, verifier.ts, cofhe.ts (sdk/web singleton), decay.ts
+├── fhenix-forms/            # STANDALONE encrypted forms product (separate deployment)
+│   └── src/
+│       ├── pages/           # Landing, Dashboard, FormBuilder, FormRespond, FormResults
+│       ├── components/      # Layout (shared navbar)
+│       └── lib/             # contract.ts (ABI + address)
 ├── verifier/
 │   └── src/
 │       ├── index.ts         # REST API (communities, polls, posts, OAuth, verify)
 │       ├── posts.ts         # Pinata-backed post store
 │       ├── tally.ts         # FHE tally + survey decryption (CoFHE SDK + viem)
 │       ├── tally-runner.ts  # Background tally loop (60s interval, handles polls + surveys)
+│       ├── forms-runner.ts  # Background forms reveal loop (FhenixForms auto-decryption)
 │       ├── oauth.ts         # Twitter, Discord, GitHub, Telegram OAuth
 │       ├── issuer.ts        # EIP-712 credential attestation signing
 │       └── checkers/        # Per-requirement-type check implementations
 └── (no local storage — all data persists on IPFS via Pinata)
 ```
+
+---
+
+## FhenixForms — Standalone Encrypted Forms
+
+A separate product sharing the same verifier backend. Deployed as its own frontend app.
+
+**Contract (Arbitrum Sepolia):** `0x1796944Ac448714897B113B5FB2cD6D79b6a5B9d`
+
+| Feature | Description |
+|---|---|
+| 5 question types | Single choice, multi choice, scale (1–10), yes/no, rating (1–5) |
+| No gating | Anyone with the link can respond — no credentials needed |
+| FHE-encrypted responses | Each answer encrypted as `euint32(0/1)` per slot |
+| Automatic reveal | `forms-runner.ts` auto-decrypts after form closes |
+| Shareable links | `/f/:formId` — share like Google Forms |
+| Drag & drop builder | Reorder questions, up to 20 per form |
+
+See [`fhenix-forms/README.md`](fhenix-forms/README.md) for full standalone docs.
 
 ## Quick start
 
@@ -141,6 +168,7 @@ npm install && npm run dev
 | Variable | Required | Description |
 |---|---|---|
 | `FHENIX_CONTRACT_ADDRESS` | Yes | Deployed FhenixPoll contract address |
+| `FHENIX_FORMS_ADDRESS` | Yes | Deployed FhenixForms contract address |
 | `VERIFIER_PRIVATE_KEY` | Yes | EVM private key — signs EIP-712 attestations + submits tally txs |
 | `DEPLOYMENT_L2_BLOCK` | Yes | L2 block when contract was deployed (for efficient event scanning) |
 | `FHENIX_RPC_URL` | No | RPC endpoint (default: Arbitrum Sepolia public RPC) |
