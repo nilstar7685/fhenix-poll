@@ -17,10 +17,6 @@ import SurveyDetail from './pages/SurveyDetail'
 import MyCredentials from './pages/MyCredentials'
 import CredentialsHub from './pages/CredentialsHub'
 import MyVotes from './pages/MyVotes'
-import FormsDashboard from './forms/pages/FormsDashboard'
-import FormBuilder from './forms/pages/FormBuilder'
-import FormRespond from './forms/pages/FormRespond'
-import FormResults from './forms/pages/FormResults'
 
 function HomeGate() {
   const { isConnected } = useWallet()
@@ -47,10 +43,6 @@ export default function App() {
         <Route path="credentials" element={<CredentialsHub />} />
         <Route path="my-credentials" element={<MyCredentials />} />
         <Route path="my-votes" element={<MyVotes />} />
-        <Route path="forms" element={<FormsDashboard />} />
-        <Route path="forms/create" element={<FormBuilder />} />
-        <Route path="forms/:formId" element={<FormRespond />} />
-        <Route path="forms/:formId/results" element={<FormResults />} />
       </Route>
     </Routes>
   )
