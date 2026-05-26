@@ -50,6 +50,18 @@ export async function pinPollMetadata(data: Partial<PollInfo>): Promise<string> 
 }
 
 /** Upload a community logo image. Returns { cid, url }. */
+export async function pinFormMetadata(data: Record<string, unknown>): Promise<string> {
+  const res = await fetch(`${VERIFIER}/pin/poll`, {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify({ poll_id: data.formId, title: data.title, ...data }),
+  })
+  if (!res.ok) throw new Error(`Pin failed: ${res.status}`)
+  const { cid } = await res.json() as { cid: string }
+  return cid
+}
+
+/** Upload a community logo image file. Returns { cid, url }. */
 export async function pinImage(file: File): Promise<{ cid: string; url: string }> {
   const form = new FormData()
   form.append('file', file)

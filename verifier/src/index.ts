@@ -13,6 +13,7 @@ import { verifyTelegramAuth } from "./checkers/social_follow.js"
 import { initSubmissions, saveSubmission, getSubmissions } from "./submissions.js"
 import { startTallyRunner, manualTally } from "./tally-runner.js"
 import { startQuestRunner } from "./quest-runner.js"
+import { startFormsRunner } from "./forms-runner.js"
 import { initPosts, savePost, getPost, getCommunityPosts } from "./posts.js"
 import { initQuests, saveQuest, getQuest, getCommunityQuests, saveQuestProgress, getQuestProgress } from "./quests.js"
 
@@ -902,6 +903,7 @@ Promise.all([
   initSubmissions()
   void startTallyRunner()
   void startQuestRunner()
+  void startFormsRunner()
   app.listen(PORT, () => {
     console.log(`FhenixPoll verifier running on http://localhost:${PORT}`)
   })
