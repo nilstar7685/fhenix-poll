@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
+import { useAccount } from 'wagmi'
 import { useCommunityStore } from '../store/communityStore'
 import { getBlockHeight } from '../lib/fhenix'
+import { usePosts } from '../hooks/usePosts'
+import CreatePostModal from '../components/CreatePostModal'
 import CredentialHub from '../components/CredentialHub'
 import PollCard from '../components/PollCard'
 import type { CommunityConfig, PollInfo } from '../types'
@@ -133,13 +136,7 @@ export default function CommunityDetail() {
       )}
 
       {tab === 'posts' && (
-        <div className="text-center py-8">
-          <p className="text-sm text-gray-500 mb-4">Community discussion board</p>
-          <Link to={`/communities/${id}/posts`}
-            className="inline-flex items-center gap-1.5 bg-gray-900 text-white px-5 py-2.5 rounded-full text-sm font-medium hover:bg-gray-800 transition-colors">
-            Open Posts →
-          </Link>
-        </div>
+        <PostsTab communityId={community.community_id} />
       )}
 
     </div>
@@ -192,6 +189,39 @@ function PollsTab({ polls, currentBlock, communityId, communityName, emptyLabel 
           </div>
         </>
       )}
+    </div>
+  )
+}
+
+function PostsTab({ communityId }: { communityId: string }) {
+  const { posts, loading, fetchPosts, createPost } = usePosts(communityId)
+  const { address } = useAccount()
+  const [showModal, setShowModal] = useState(false)
+
+  useEffect(() => { fetchPosts() }, [fetchPosts])
+
+  if (loading) return <div className="flex justify-center py-8"><div className="w-5 h-5 border-2 border-[#0070F3] border-t-transparent rounded-full animate-spin" /></div>
+
+  return (
+    <div>
+      {posts.length === 0 ? (
+        <div className="bg-white border border-gray-100 rounded-2xl p-8 text-center">
+          <p className="text-sm text-gray-500 mb-4">No posts yet.</p>
+          {address && <button onClick={() => setShowModal(true)} className="text-sm font-medium text-[#0070F3] hover:underline">Write the first post →</button>}
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {posts.map(post => (
+            <Link key={post.post_id} to={`/communities/${communityId}/posts/${post.post_id}`}
+              className="bg-white border border-gray-100 rounded-2xl p-4 hover:border-gray-200 hover:shadow-sm transition-all block">
+              <h3 className="text-sm font-semibold text-gray-900">{post.title}</h3>
+              <p className="text-xs text-gray-500 mt-1 line-clamp-2">{post.body.slice(0, 120).replace(/[#*`\[\]]/g, '')}</p>
+              <span className="text-[11px] text-gray-400 mt-2 inline-block font-mono">{post.author.slice(0, 6)}…{post.author.slice(-4)}</span>
+            </Link>
+          ))}
+        </div>
+      )}
+      {showModal && <CreatePostModal onSubmit={createPost} onClose={() => setShowModal(false)} />}
     </div>
   )
 }
