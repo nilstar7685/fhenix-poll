@@ -11,6 +11,7 @@ import { keccak256, stringToHex } from 'viem'
 import { getGasFees } from '../lib/gas'
 import { listCommunities, confirmPoll } from '../lib/verifier'
 import { pinPollMetadata } from '../lib/pinata'
+import ShareButtons from './ShareButtons'
 import { FHENIX_POLL_ABI, CONTRACT_ADDRESS } from '../lib/abi'
 import type { CommunityConfig } from '../types'
 
@@ -77,6 +78,7 @@ export default function CreateSurveyWizard() {
   const [deployMessage, setDeployMessage] = useState('')
   const [deployError, setDeployError] = useState('')
   const [createdTxHash, setCreatedTxHash] = useState('')
+  const [createdPollId, setCreatedPollId] = useState('')
 
   useEffect(() => { listCommunities().then(setCommunities).catch(() => null) }, [])
 
@@ -140,6 +142,7 @@ export default function CreateSurveyWizard() {
       })
 
       setCreatedTxHash(hash)
+      setCreatedPollId(pollId)
       setDeployMessage('Waiting for confirmation…')
       await publicClient.waitForTransactionReceipt({ hash })
 
@@ -301,12 +304,16 @@ export default function CreateSurveyWizard() {
                   </div>
                   <h3 className="text-lg font-semibold text-gray-900 mb-1">Survey Created!</h3>
                   <p className="text-sm text-gray-500 mb-4">{title}</p>
+                  <ShareButtons
+                    url={`${window.location.origin}/communities/${communityId}/surveys/${createdPollId}`}
+                    title={title}
+                  />
                   {createdTxHash && (
                     <a href={`https://sepolia.arbiscan.io/tx/${createdTxHash}`} target="_blank" rel="noreferrer"
-                      className="text-xs text-[#0070F3] hover:underline mb-4">View on Arbiscan ↗</a>
+                      className="text-xs text-[#0070F3] hover:underline mb-4 mt-3">View on Arbiscan ↗</a>
                   )}
                   <button onClick={() => navigate(`/communities/${communityId}`)}
-                    className="px-6 py-2.5 bg-gray-900 text-white text-sm font-medium rounded-full hover:bg-gray-800 transition-colors">
+                    className="px-6 py-2.5 bg-gray-900 text-white text-sm font-medium rounded-full hover:bg-gray-800 transition-colors mt-2">
                     Back to Community
                   </button>
                 </>

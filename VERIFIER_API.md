@@ -241,12 +241,6 @@ Starts on boot. Every 60 seconds:
 - Skips polls with `l1Block <= endBlock + 2` (buffer to avoid boundary race)
 - Runs `runTallyForPoll` for ended, unrevealed polls with votes
 
-### Automated Forms Runner
-Starts on boot alongside tally runner. Every 60 seconds:
-- Scans `FormCreated` events from `FHENIX_FORMS_ADDRESS`
-- For closed, unrevealed forms with responses: calls `requestFormReveal` + `publishFormResult`
-- Same Threshold Network decryption pattern as polls
-
 ---
 
 ## Error Codes

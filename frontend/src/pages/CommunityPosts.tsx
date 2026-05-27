@@ -4,6 +4,11 @@ import { useAccount } from 'wagmi'
 import { usePosts } from '../hooks/usePosts'
 import CreatePostModal from '../components/CreatePostModal'
 
+function readingTime(text: string): string {
+  const words = text.split(/\s+/).filter(Boolean).length
+  return `${Math.max(1, Math.ceil(words / 200))} min read`
+}
+
 export default function CommunityPosts() {
   const { id = '' } = useParams<{ id: string }>()
   const { address } = useAccount()
@@ -21,10 +26,8 @@ export default function CommunityPosts() {
           <h1 className="text-sm font-semibold text-gray-900">Posts</h1>
         </div>
         {address && (
-          <button
-            onClick={() => setShowModal(true)}
-            className="flex items-center gap-1.5 text-xs font-medium bg-gray-900 text-white px-3.5 py-2 rounded-full hover:bg-gray-800 transition-colors"
-          >
+          <button onClick={() => setShowModal(true)}
+            className="flex items-center gap-1.5 text-xs font-medium bg-gray-900 text-white px-3.5 py-2 rounded-full hover:bg-gray-800 transition-colors">
             + New Post
           </button>
         )}
@@ -42,46 +45,42 @@ export default function CommunityPosts() {
         <div className="bg-white border border-gray-100 rounded-2xl p-10 text-center">
           <p className="text-sm text-gray-500 mb-3">No posts yet.</p>
           {address && (
-            <button onClick={() => setShowModal(true)}
-              className="text-sm font-medium text-[#0070F3] hover:underline">
+            <button onClick={() => setShowModal(true)} className="text-sm font-medium text-[#0070F3] hover:underline">
               Be the first to post →
             </button>
           )}
         </div>
       )}
 
-      <div className="space-y-4">
-        {posts.map(post => (
-          <div key={post.post_id} className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
-            <div className="flex items-start justify-between gap-3 mb-2">
-              <h2 className="text-sm font-semibold text-gray-900">{post.title}</h2>
-              <span className="text-xs text-gray-400 shrink-0">
-                {post.author.slice(0, 6)}…{post.author.slice(-4)}
-              </span>
-            </div>
-            <p className="text-sm text-gray-600 whitespace-pre-wrap leading-relaxed">{post.body}</p>
-            {(post as any).image_url && (
-              <img src={(post as any).image_url} alt="" className="mt-3 rounded-xl max-h-64 object-cover w-full border border-gray-100" />
-            )}
-            {post.ipfs_cid && (
-              <a
-                href={`https://ipfs.io/ipfs/${post.ipfs_cid}`}
-                target="_blank" rel="noreferrer"
-                className="text-xs text-[#0070F3] hover:underline mt-2 inline-block"
-              >
-                View on IPFS ↗
-              </a>
-            )}
-          </div>
-        ))}
+      <div className="space-y-3">
+        {posts.map(post => {
+          const imageUrl = (post as any).image_url || (post as any).imageUrl
+          const preview = post.body.slice(0, 150).replace(/[#*`\[\]]/g, '')
+          return (
+            <Link key={post.post_id} to={`/communities/${id}/posts/${post.post_id}`}
+              className="bg-white border border-gray-100 rounded-2xl p-5 hover:border-gray-200 hover:shadow-sm transition-all block">
+              <div className="flex gap-4">
+                {/* Text content */}
+                <div className="flex-1 min-w-0">
+                  <h2 className="text-base font-semibold text-gray-900 leading-snug mb-1.5">{post.title}</h2>
+                  <p className="text-sm text-gray-500 line-clamp-2 leading-relaxed">{preview}{post.body.length > 150 ? '…' : ''}</p>
+                  <div className="flex items-center gap-3 mt-3 text-xs text-gray-400">
+                    <span className="font-mono">{post.author.slice(0, 6)}…{post.author.slice(-4)}</span>
+                    <span>·</span>
+                    <span>{readingTime(post.body)}</span>
+                  </div>
+                </div>
+                {/* Thumbnail */}
+                {imageUrl && (
+                  <img src={imageUrl} alt="" className="w-20 h-20 rounded-xl object-cover shrink-0 border border-gray-100" />
+                )}
+              </div>
+            </Link>
+          )
+        })}
       </div>
 
-      {showModal && (
-        <CreatePostModal
-          onSubmit={createPost}
-          onClose={() => setShowModal(false)}
-        />
-      )}
+      {showModal && <CreatePostModal onSubmit={createPost} onClose={() => setShowModal(false)} />}
     </div>
   )
 }

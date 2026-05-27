@@ -6,8 +6,6 @@
 
 ## How it works
 
-![FhenixPoll sequence diagram](frontend/public/fhenix-poll-flow.svg)
-
 | Step | Actor | Action |
 |------|-------|--------|
 | 1 | **Creator** | `registerCommunity()` → community + membership rules stored on-chain |
@@ -22,7 +20,7 @@
 | 10 | **Threshold Network** | Returns `plaintext + signature` |
 | 11 | **Verifier** | `publishTallyResult(plaintext, sig)` or `publishSurveyResult()` → sig verified on-chain |
 | 12 | **Voter** | Reads `revealedTallies` / `surveyRevealedTallies` directly from contract → **trustless result verification** |
-| 13 | **Voter** | `createPost(contentHash)` → IPFS content hash stored on-chain |
+| 13 | **Member** | `createPost(contentHash)` → IPFS content hash stored on-chain (gated) |
 
 ## Features
 
@@ -52,7 +50,6 @@
 - `castSurveyVote()` accumulates encrypted answers into `_surveyTallies[pollId][questionId][answerId]`
 - `requestSurveyReveal()` + `publishSurveyResult()` — same Threshold Network pattern as polls
 - Results page shows per-question bar charts with counts and percentages
-- Dedicated Create Survey wizard and Survey voting UI (separate from polls)
 
 ### Tally & Results
 - After poll closes, `requestTallyReveal()` calls `FHE.allowPublic` per option (no `FHE.decrypt` — new pattern)
@@ -61,11 +58,25 @@
 - Hierarchical polls show nested tree results with `rolledUpTallies` for parent nodes
 - Automated tally runner checks every 60 seconds; manual trigger via `POST /admin/tally/:pollId`
 
-### Community Posts
-- Credentialed members can post content (title + markdown body + optional image URL)
+### Community Posts & Articles
+- Credentialed members can publish articles (title + markdown body + cover image)
+- Markdown editor with toolbar (bold, italic, headings, code, links, lists)
+- Article cards with preview text, thumbnail, author, and reading time
+- Full article view with rendered markdown
 - Content stored on IPFS; `keccak256(CID)` stored on-chain via `createPost()`
 - Gated communities require a valid credential to post
-- Image support via URL link with live preview in creation modal
+
+### Social Sharing
+- Share buttons on poll/survey creation success (Twitter/X, Telegram, Copy Link)
+- Share icon on every poll card — one-click copy link
+- Mobile native share via Web Share API
+
+### Poll Time Indicators
+- Live countdown timer on poll cards (`2d 14h 32m`)
+- Progress bar showing time elapsed vs total duration (green → amber → red)
+- Pulsing red dot for polls closing within 24 hours
+- "Closed Xm ago" with relative time instead of just "Closed"
+- "Results ready" badge when tally is complete
 
 ### Voting power decay
 ```
@@ -78,61 +89,32 @@ Period 1: 100% → Period 2: 50% → Period 3: 25% → Period 4: 12.5% → Perio
 ```
 zkpoll/
 ├── contracts/
-│   ├── contracts/FhenixPoll.sol   # registerCommunity, createPoll, createHierarchicalPoll,
-│   │                              # issueCredential, castVote, requestTallyReveal,
-│   │                              # publishTallyResult, createPost, createSimplePoll,
-│   │                              # castSimpleVote, createSurvey, castSurveyVote,
-│   │                              # requestSurveyReveal, publishSurveyResult
-│   └── contracts/FhenixForms.sol  # createForm, submitResponse, requestFormReveal,
-│                                  # publishFormResult (standalone encrypted forms)
+│   └── contracts/FhenixPoll.sol   # registerCommunity, createPoll, createHierarchicalPoll,
+│                                  # issueCredential, castVote, requestTallyReveal,
+│                                  # publishTallyResult, createPost, createSimplePoll,
+│                                  # castSimpleVote, createSurvey, castSurveyVote,
+│                                  # requestSurveyReveal, publishSurveyResult
 ├── frontend/
 │   └── src/
-│       ├── pages/           # PollFeed, Surveys, Activity, CommunityFeed, CommunityDetail
-│       │                    # (Polls/Surveys/Posts tabs), PollDetail, SurveyDetail,
-│       │                    # PollResults (hierarchical tree + survey per-question charts),
+│       ├── pages/           # PollFeed, Surveys, Activity, CommunityFeed, CommunityDetail,
+│       │                    # PollDetail, SurveyDetail, PollResults, PostDetail,
 │       │                    # CredentialsHub, MyVotes, CommunityPosts
 │       ├── components/      # CreateCommunityWizard, CreatePollWizard (flat + hierarchical + simple),
-│       │                    # CreateSurveyWizard, CredentialHub, VotingMode, CreatePostModal,
-│       │                    # VoteConfirmModal (adapts for simple/ranked)
-│       ├── hooks/           # useVoting (castVote + castSimple + castSurvey),
-│       │                    # useCredentialHub, usePosts, useCofheClient, useWriteContract
-│       └── lib/             # fhenix.ts, verifier.ts, cofhe.ts (sdk/web singleton), decay.ts
-├── fhenix-forms/            # STANDALONE encrypted forms product (separate deployment)
-│   └── src/
-│       ├── pages/           # Landing, Dashboard, FormBuilder, FormRespond, FormResults
-│       ├── components/      # Layout (shared navbar)
-│       └── lib/             # contract.ts (ABI + address)
+│       │                    # CreateSurveyWizard, CreatePostModal (markdown toolbar),
+│       │                    # ShareButtons, VoteConfirmModal, PollCard (countdown + progress)
+│       ├── hooks/           # useVoting, useCredentialHub, usePosts, useCofheClient, useWriteContract
+│       └── lib/             # fhenix.ts, verifier.ts, cofhe.ts, decay.ts
 ├── verifier/
 │   └── src/
 │       ├── index.ts         # REST API (communities, polls, posts, OAuth, verify)
 │       ├── posts.ts         # Pinata-backed post store
 │       ├── tally.ts         # FHE tally + survey decryption (CoFHE SDK + viem)
 │       ├── tally-runner.ts  # Background tally loop (60s interval, handles polls + surveys)
-│       ├── forms-runner.ts  # Background forms reveal loop (FhenixForms auto-decryption)
 │       ├── oauth.ts         # Twitter, Discord, GitHub, Telegram OAuth
 │       ├── issuer.ts        # EIP-712 credential attestation signing
 │       └── checkers/        # Per-requirement-type check implementations
 └── (no local storage — all data persists on IPFS via Pinata)
 ```
-
----
-
-## FhenixForms — Standalone Encrypted Forms
-
-A separate product sharing the same verifier backend. Deployed as its own frontend app.
-
-**Contract (Arbitrum Sepolia):** `0x1796944Ac448714897B113B5FB2cD6D79b6a5B9d`
-
-| Feature | Description |
-|---|---|
-| 5 question types | Single choice, multi choice, scale (1–10), yes/no, rating (1–5) |
-| No gating | Anyone with the link can respond — no credentials needed |
-| FHE-encrypted responses | Each answer encrypted as `euint32(0/1)` per slot |
-| Automatic reveal | `forms-runner.ts` auto-decrypts after form closes |
-| Shareable links | `/f/:formId` — share like Google Forms |
-| Drag & drop builder | Reorder questions, up to 20 per form |
-
-See [`fhenix-forms/README.md`](fhenix-forms/README.md) for full standalone docs.
 
 ## Quick start
 
@@ -168,7 +150,6 @@ npm install && npm run dev
 | Variable | Required | Description |
 |---|---|---|
 | `FHENIX_CONTRACT_ADDRESS` | Yes | Deployed FhenixPoll contract address |
-| `FHENIX_FORMS_ADDRESS` | Yes | Deployed FhenixForms contract address |
 | `VERIFIER_PRIVATE_KEY` | Yes | EVM private key — signs EIP-712 attestations + submits tally txs |
 | `DEPLOYMENT_L2_BLOCK` | Yes | L2 block when contract was deployed (for efficient event scanning) |
 | `FHENIX_RPC_URL` | No | RPC endpoint (default: Arbitrum Sepolia public RPC) |
@@ -179,7 +160,7 @@ npm install && npm run dev
 | `DISCORD_CLIENT_ID/SECRET` | Discord OAuth | Discord connect flow |
 | `GITHUB_CLIENT_ID/SECRET` | GitHub OAuth | GitHub connect flow |
 | `TELEGRAM_BOT_TOKEN/USERNAME` | Telegram | Widget auth |
-| `PINATA_JWT` / `PINATA_GATEWAY` | **Required** | IPFS storage — all community/poll/post/quest data persists on IPFS (no local files) |
+| `PINATA_JWT` / `PINATA_GATEWAY` | **Required** | IPFS storage — all community/poll/post data persists on IPFS (no local files) |
 | `APP_URL` | OAuth | Verifier's public URL for OAuth callbacks |
 
 ## Contract functions

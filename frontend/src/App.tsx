@@ -6,6 +6,7 @@ import PollFeed from './pages/PollFeed'
 import CommunityFeed from './pages/CommunityFeed'
 import CommunityDetail from './pages/CommunityDetail'
 import CommunityPosts from './pages/CommunityPosts'
+import PostDetail from './pages/PostDetail'
 import PollDetail from './pages/PollDetail'
 import PollResults from './pages/PollResults'
 import CreateCommunity from './pages/CreateCommunity'
@@ -34,6 +35,7 @@ export default function App() {
         <Route path="communities" element={<CommunityFeed />} />
         <Route path="communities/:id" element={<CommunityDetail />} />
         <Route path="communities/:id/posts" element={<CommunityPosts />} />
+        <Route path="communities/:id/posts/:postId" element={<PostDetail />} />
         <Route path="communities/:communityId/polls/:pollId" element={<PollDetail />} />
         <Route path="communities/:communityId/surveys/:pollId" element={<SurveyDetail />} />
         <Route path="communities/:communityId/polls/:pollId/results" element={<PollResults />} />

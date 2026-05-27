@@ -12,6 +12,7 @@ import { useConnection } from 'wagmi'
 import { arbitrumSepolia } from '../lib/chains'
 import { getBlockHeight, pollIdFromTitle, publicClient } from '../lib/fhenix'
 import { keccak256, stringToHex } from 'viem'
+import ShareButtons from './ShareButtons'
 import { getGasFees } from '../lib/gas'
 import { listCommunities, confirmPoll } from '../lib/verifier'
 import { pinPollMetadata } from '../lib/pinata'
@@ -584,6 +585,10 @@ export default function CreatePollWizard() {
                     <p className="font-semibold text-gray-900">Poll created!</p>
                     <p className="text-xs text-gray-500 mt-1">{createdPollId.slice(0, 22)}…</p>
                   </div>
+                  <ShareButtons
+                    url={`${window.location.origin}/communities/${communityId}/polls/${createdPollId}`}
+                    title={title}
+                  />
                   {createdTxHash && (
                     <a href={`https://sepolia.arbiscan.io/tx/${createdTxHash}`}
                       target="_blank" rel="noopener noreferrer"
