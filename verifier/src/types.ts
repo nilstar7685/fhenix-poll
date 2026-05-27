@@ -111,6 +111,7 @@ export interface PostMetadata {
   author: string         // EVM address
   title: string
   body: string           // markdown content
+  image_url?: string     // optional cover image URL
   ipfs_cid?: string
   content_hash: string   // keccak256(ipfs_cid) stored on-chain
   created_at_block: number
