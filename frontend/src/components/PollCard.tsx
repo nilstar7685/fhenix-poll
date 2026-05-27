@@ -9,45 +9,30 @@ interface Props {
   poll: PollInfo
 }
 
-// Arbitrum Sepolia: ~4 blocks/sec → 345600 blocks/day
-const BLOCKS_PER_SEC = 4
-const BLOCKS_PER_DAY = 345_600
-
-function formatCountdown(blocksLeft: number): string {
-  const totalSec = Math.max(0, Math.floor(blocksLeft / BLOCKS_PER_SEC))
-  const d = Math.floor(totalSec / 86400)
-  const h = Math.floor((totalSec % 86400) / 3600)
-  const m = Math.floor((totalSec % 3600) / 60)
-  if (d > 0) return `${d}d ${h}h ${m}m`
-  if (h > 0) return `${h}h ${m}m`
-  const s = totalSec % 60
-  return `${m}m ${s}s`
-}
+// Arbitrum Sepolia: ~0.25s per block
 
 function getDeadlineInfo(endBlock: number, startBlock: number, currentBlock: number) {
-  if (currentBlock === 0) return { text: `ends #${endBlock.toLocaleString()}`, cls: 'text-gray-400 bg-gray-50 border-gray-100', progress: 0, closed: false, closingSoon: false }
+  if (currentBlock === 0) return { text: `ends #${endBlock.toLocaleString()}`, cls: 'text-gray-400 bg-gray-50 border-gray-100', closed: false, closingSoon: false }
 
   const blocksLeft = endBlock - currentBlock
   if (blocksLeft <= 0) {
-    const closedAgo = Math.abs(blocksLeft)
-    const closedSec = Math.floor(closedAgo / BLOCKS_PER_SEC)
-    const closedText = closedSec < 3600 ? `${Math.floor(closedSec / 60)}m ago` : closedSec < 86400 ? `${Math.floor(closedSec / 3600)}h ago` : `${Math.floor(closedSec / 86400)}d ago`
-    return { text: `Closed ${closedText}`, cls: 'text-gray-400 bg-gray-50 border-gray-100', progress: 100, closed: true, closingSoon: false }
+    return { text: 'Closed', cls: 'text-gray-400 bg-gray-50 border-gray-100', closed: true, closingSoon: false }
   }
 
-  const totalDuration = endBlock - startBlock
-  const elapsed = currentBlock - startBlock
-  const progress = totalDuration > 0 ? Math.min(100, Math.round((elapsed / totalDuration) * 100)) : 0
+  // Convert blocks to time — Arbitrum Sepolia ~0.25s/block
+  const secsLeft = blocksLeft * 0.25
+  const closingSoon = secsLeft < 86400
 
-  const secsLeft = blocksLeft / BLOCKS_PER_SEC
-  const closingSoon = secsLeft < 86400 // < 24h
+  const d = Math.floor(secsLeft / 86400)
+  const h = Math.floor((secsLeft % 86400) / 3600)
+  const m = Math.floor((secsLeft % 3600) / 60)
+  const text = d > 0 ? `${d}d ${h}h left` : h > 0 ? `${h}h ${m}m left` : `${m}m left`
 
-  const text = formatCountdown(blocksLeft)
   const cls = secsLeft < 3600 ? 'text-red-500 bg-red-50 border-red-100'
     : secsLeft < 86400 ? 'text-amber-600 bg-amber-50 border-amber-100'
     : 'text-gray-500 bg-gray-50 border-gray-100'
 
-  return { text, cls, progress, closed: false, closingSoon }
+  return { text, cls, closed: false, closingSoon }
 }
 
 export default function PollCard({ communityId, communityName, poll }: Props) {
