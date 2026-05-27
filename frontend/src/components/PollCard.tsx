@@ -71,23 +71,11 @@ export default function PollCard({ communityId, communityName, poll }: Props) {
   const startBlock = poll.end_block ? poll.end_block - (poll.end_block - (currentBlock || poll.end_block)) : 0
   const deadline = poll.end_block ? getDeadlineInfo(poll.end_block, startBlock, currentBlock) : null
 
-  // Progress bar color
-  const progressColor = deadline
-    ? deadline.progress > 80 ? 'bg-red-400' : deadline.progress > 60 ? 'bg-amber-400' : 'bg-emerald-400'
-    : 'bg-gray-200'
-
   return (
     <Link
       to={poll.poll_type === 'survey' ? `/communities/${communityId}/surveys/${poll.poll_id}` : `/communities/${communityId}/polls/${poll.poll_id}`}
-      className="border border-gray-100 bg-white rounded-[1.25rem] p-5 hover:border-gray-200 hover:shadow-[0_4px_20px_-10px_rgba(0,0,0,0.08)] transition-all group flex flex-col justify-between min-h-[160px] block relative overflow-hidden"
+      className="border border-gray-100 bg-white rounded-[1.25rem] p-5 hover:border-gray-200 hover:shadow-[0_4px_20px_-10px_rgba(0,0,0,0.08)] transition-all group flex flex-col justify-between min-h-[160px] block"
     >
-      {/* Progress bar at top */}
-      {deadline && currentBlock > 0 && (
-        <div className="absolute top-0 left-0 right-0 h-1 bg-gray-100">
-          <div className={`h-full ${progressColor} transition-all duration-500`} style={{ width: `${deadline.progress}%` }} />
-        </div>
-      )}
-
       <div className="pt-1">
         <div className="flex justify-between items-start gap-3">
           <h3 className="text-base font-medium text-gray-900 leading-snug">{poll.title}</h3>
